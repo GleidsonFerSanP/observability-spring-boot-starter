@@ -7,11 +7,14 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Motor de Atribuição de Latência (Candidate Architecture v2).
+ * Motor de Atribuição de Latência (Candidate Architecture v2 - Seções 4, 9, 10, 11, 12, 37, 38).
  * Garante as três dimensões temporais fundamentais do Flow:
- * 1. Wall-Clock Duration (tempo percebido externamente)
- * 2. Work Duration (soma de todo trabalho executado, suportando paralelismo onde Work > Wall-Clock)
- * 3. Attributed Duration (latência matematicamente atribuída sem valores negativos ou mascaramentos).
+ * 1. Wall-Clock Duration (tempo percebido externamente: observability.flow.duration)
+ * 2. Work Duration (soma de todo trabalho executado: observability.flow.component.work.duration)
+ * 3. Attributed Duration (latência matematicamente atribuída: observability.flow.component.attributed.duration)
+ * Além das métricas analíticas:
+ * - observability.flow.parallel.overlap.duration
+ * - observability.flow.unattributed.duration
  */
 public class LatencyAttributionEngine {
 
@@ -44,6 +47,12 @@ public class LatencyAttributionEngine {
             long unattributedNanos = Math.max(0, wallClockNanos - sumWorkNanos);
             recordAttributedMetric(registry, flowName, "Internal & Framework", "INTERNAL", unattributedNanos);
 
+            Timer.builder("observability.flow.unattributed.duration")
+                    .tag("flow", flowName)
+                    .description("Duração de latência ainda não explicada por subprocessos instrumentados no fluxo")
+                    .register(registry)
+                    .record(unattributedNanos, TimeUnit.NANOSECONDS);
+
         } else {
             // Cenário com paralelismo ou sobreposição temporal (Work > Wall-Clock):
             // Aplica normalização proporcional de contribuição para manter a invariante do gráfico de composição:
@@ -58,6 +67,13 @@ public class LatencyAttributionEngine {
 
                 recordAttributedMetric(registry, flowName, component, type, attributedNanos);
             }
+
+            long overlapNanos = sumWorkNanos - wallClockNanos;
+            Timer.builder("observability.flow.parallel.overlap.duration")
+                    .tag("flow", flowName)
+                    .description("Duração de sobreposição de subprocessos paralelos no fluxo")
+                    .register(registry)
+                    .record(overlapNanos, TimeUnit.NANOSECONDS);
         }
     }
 

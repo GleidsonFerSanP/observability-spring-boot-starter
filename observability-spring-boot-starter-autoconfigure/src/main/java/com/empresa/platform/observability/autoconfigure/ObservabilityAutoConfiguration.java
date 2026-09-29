@@ -112,4 +112,10 @@ public class ObservabilityAutoConfiguration {
     public CorrelationIdFilter correlationIdFilter() {
         return new CorrelationIdFilter();
     }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public com.empresa.platform.observability.autoconfigure.async.ObservabilityTaskDecorator observabilityTaskDecorator() {
+        return new com.empresa.platform.observability.autoconfigure.async.ObservabilityTaskDecorator();
+    }
 }

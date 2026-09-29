@@ -55,8 +55,9 @@ public class LegLoggingAspect {
         Object[] args = joinPoint.getArgs();
 
         try {
+            boolean shouldIncludePayload = (logLeg != null && (logLeg.includePayload() || (logLeg.mask() != null && logLeg.mask().length > 0)));
             JsonNode maskedRequest = null;
-            if (logLeg == null || logLeg.includePayload()) {
+            if (shouldIncludePayload) {
                 Object requestPayload = (args.length == 1) ? args[0] : args;
                 maskedRequest = maskingService.maskPayload(requestPayload, method, args, null, logLeg != null ? logLeg.mask() : null);
             }
@@ -91,8 +92,9 @@ public class LegLoggingAspect {
             MDC.put("leg_duration_ms", String.valueOf(durationMs));
             MDC.put("leg_status", "SUCCESS");
 
+            boolean shouldIncludePayload = (logLeg != null && (logLeg.includePayload() || (logLeg.mask() != null && logLeg.mask().length > 0)));
             JsonNode maskedResponse = null;
-            if (logLeg == null || logLeg.includePayload()) {
+            if (shouldIncludePayload) {
                 maskedResponse = maskingService.maskPayload(result, method, args, result, logLeg != null ? logLeg.mask() : null);
             }
 

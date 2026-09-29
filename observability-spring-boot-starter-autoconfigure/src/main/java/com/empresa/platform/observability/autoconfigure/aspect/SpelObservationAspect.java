@@ -75,11 +75,17 @@ public class SpelObservationAspect {
         return result;
     }
 
+    private static final java.util.Set<String> DANGEROUS_METRIC_KEYS = java.util.Set.of(
+            "trace_id", "traceid", "correlation_id", "correlationid",
+            "account_id", "accountid", "order_id", "orderid"
+    );
+
     private void evaluateAndTag(Observation observation, EvaluationContext context, ObservationTag tag) {
         try {
             String value = parser.parseExpression(tag.expression()).getValue(context, String.class);
             if (value != null) {
-                if (tag.highCardinality()) {
+                boolean forceHigh = tag.highCardinality() || DANGEROUS_METRIC_KEYS.contains(tag.key().toLowerCase());
+                if (forceHigh) {
                     observation.highCardinalityKeyValue(tag.key(), value);
                 } else {
                     observation.lowCardinalityKeyValue(tag.key(), value);

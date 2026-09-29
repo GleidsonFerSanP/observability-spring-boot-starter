@@ -24,8 +24,9 @@ public @interface LogLeg {
 
     /**
      * Se verdadeiro, serializa e audita os payloads de requisição e resposta (com máscaras aplicadas).
+     * Conforme Candidate Architecture v2 (Seção 33), o padrão corporativo é false (opt-in explícito ou presença de @MaskField).
      */
-    boolean includePayload() default true;
+    boolean includePayload() default false;
 
     /**
      * Regras de mascaramento de dados sensíveis avaliadas dinamicamente via SpEL.
