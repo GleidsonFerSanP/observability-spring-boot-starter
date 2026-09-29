@@ -1,6 +1,7 @@
 package com.empresa.platform.observability.core.flow;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -133,5 +134,43 @@ class LatencyAttributionEngineTest {
         assertThat(meterRegistry.find("observability.flow.unattributed.duration")
                 .tag("flow", "parallel-enrichment-flow")
                 .timer()).isNull();
+    }
+
+    @Test
+    @DisplayName("Invariante 3: Propagação de FlowDimensions (variant/feature) para as métricas do motor de atribuição")
+    void shouldAttributeSequentialWorkWithDimensions() {
+        long wallClockNanos = TimeUnit.MILLISECONDS.toNanos(1000);
+        FlowExecution flow = new FlowExecution("migrated-flow", wallClockNanos);
+        flow.setFeature("payment-v2");
+        flow.setVariant("new");
+        flow.recordStep("cache-redis", TimeUnit.MILLISECONDS.toNanos(200));
+
+        LatencyAttributionEngine.recordAttributions(flow, meterRegistry);
+
+        Timer workTimer = meterRegistry.get("observability.flow.component.work.duration")
+                .tag("flow", "migrated-flow")
+                .tag("component", "cache-redis")
+                .tag("variant", "new")
+                .tag("feature", "payment-v2")
+                .timer();
+        assertThat(workTimer).isNotNull();
+        assertThat(workTimer.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(200.0);
+
+        Timer attrTimer = meterRegistry.get("observability.flow.component.attributed.duration")
+                .tag("flow", "migrated-flow")
+                .tag("component", "cache-redis")
+                .tag("variant", "new")
+                .tag("feature", "payment-v2")
+                .timer();
+        assertThat(attrTimer).isNotNull();
+        assertThat(attrTimer.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(200.0);
+
+        Timer unattributedTimer = meterRegistry.get("observability.flow.unattributed.duration")
+                .tag("flow", "migrated-flow")
+                .tag("variant", "new")
+                .tag("feature", "payment-v2")
+                .timer();
+        assertThat(unattributedTimer).isNotNull();
+        assertThat(unattributedTimer.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(800.0);
     }
 }

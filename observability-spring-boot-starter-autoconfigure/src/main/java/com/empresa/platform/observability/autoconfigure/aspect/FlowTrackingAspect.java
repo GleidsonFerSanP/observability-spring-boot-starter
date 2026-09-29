@@ -8,12 +8,14 @@ import com.empresa.platform.observability.core.alerting.AlertingProperties;
 import com.empresa.platform.observability.core.annotation.TrackFlow;
 import com.empresa.platform.observability.core.annotation.TrackStep;
 import com.empresa.platform.observability.core.flow.FlowContext;
+import com.empresa.platform.observability.core.flow.FlowExecution;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 
 import java.util.Map;
@@ -69,8 +71,19 @@ public class FlowTrackingAspect {
             flowObservation.highCardinalityKeyValue("error.message", t.getMessage() != null ? t.getMessage() : "null");
             throw t;
         } finally {
+            FlowExecution execution = FlowContext.getCurrentExecution();
+            if (execution != null) {
+                for (Map.Entry<String, String> entry : execution.getDimensions().asMap().entrySet()) {
+                    flowObservation.lowCardinalityKeyValue(entry.getKey(), entry.getValue());
+                }
+            }
+
             FlowContext.complete(meterRegistry);
             flowObservation.stop();
+
+            MDC.remove("variant");
+            MDC.remove("feature.name");
+            MDC.remove("feature.variant");
 
             long totalDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             long flowThresholdMs = alertingProperties.getThresholdForFlow(flowName);
@@ -104,8 +117,13 @@ public class FlowTrackingAspect {
                 .lowCardinalityKeyValue("flow", currentFlow)
                 .lowCardinalityKeyValue("step", stepName)
                 .lowCardinalityKeyValue("step.type", trackStep.type())
-                .contextualName(stepName)
-                .start();
+                .contextualName(stepName);
+
+        String currentVariant = FlowContext.getCurrentDimensions().getVariant();
+        if (currentVariant != null) {
+            stepObservation.lowCardinalityKeyValue("variant", currentVariant);
+        }
+        stepObservation.start();
 
         try (Observation.Scope scope = stepObservation.openScope()) {
             return joinPoint.proceed();

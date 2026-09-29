@@ -1,5 +1,6 @@
 package com.empresa.platform.observability.core.flow;
 
+import com.empresa.platform.observability.core.feature.FlowFeatureEvaluationListener;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 import java.util.concurrent.TimeUnit;
 
@@ -21,11 +23,13 @@ class FlowContextTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         FlowContext.clear();
+        MDC.clear();
     }
 
     @AfterEach
     void tearDown() {
         FlowContext.clear();
+        MDC.clear();
     }
 
     @Test
@@ -71,5 +75,86 @@ class FlowContextTest {
                 .counter();
         assertThat(legacyCounter).isNotNull();
         assertThat(legacyCounter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("Deve propagar FlowDimensions (variant e feature) para todas as métricas de flow e fatias")
+    void shouldPropagateFlowDimensionsToAllMetrics() {
+        FlowContext.start("payment-migration-flow");
+        FlowContext.setFeature("payment-v2");
+        FlowContext.setVariant("new");
+        FlowContext.recordStep("step-redis", TimeUnit.MILLISECONDS.toNanos(80));
+        FlowContext.complete(meterRegistry);
+
+        Timer totalTimer = meterRegistry.find("flow_total_duration_seconds")
+                .tag("flow", "payment-migration-flow")
+                .tag("variant", "new")
+                .timer();
+        assertThat(totalTimer).isNotNull();
+
+        Timer stepTimer = meterRegistry.find("flow_slice_duration_seconds")
+                .tag("flow", "payment-migration-flow")
+                .tag("step", "step-redis")
+                .tag("variant", "new")
+                .timer();
+        assertThat(stepTimer).isNotNull();
+        assertThat(stepTimer.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(80.0);
+
+        Timer workTimer = meterRegistry.find("observability.flow.component.work.duration")
+                .tag("flow", "payment-migration-flow")
+                .tag("component", "step-redis")
+                .tag("variant", "new")
+                .timer();
+        assertThat(workTimer).isNotNull();
+        assertThat(workTimer.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(80.0);
+
+        Timer wallClockTimer = meterRegistry.find("observability.flow.duration")
+                .tag("flow", "payment-migration-flow")
+                .tag("variant", "new")
+                .timer();
+        assertThat(wallClockTimer).isNotNull();
+
+        Timer attributedTimer = meterRegistry.find("observability.flow.component.attributed.duration")
+                .tag("flow", "payment-migration-flow")
+                .tag("component", "step-redis")
+                .tag("variant", "new")
+                .timer();
+        assertThat(attributedTimer).isNotNull();
+        assertThat(attributedTimer.totalTime(TimeUnit.MILLISECONDS)).isGreaterThan(0.0);
+    }
+
+    @Test
+    @DisplayName("Deve enriquecer dimensões e MDC via FlowFeatureEvaluationListener de forma desacoplada")
+    void shouldEnrichDimensionsAndMdcViaFeatureEvaluationListener() {
+        FlowContext.start("user-registration-flow");
+        FlowFeatureEvaluationListener listener = new FlowFeatureEvaluationListener();
+
+        // Avaliação de feature flag booleana
+        listener.onFeatureEvaluated("user-v2", true);
+
+        assertThat(FlowContext.getCurrentDimensions().getVariant()).isEqualTo("new");
+        assertThat(FlowContext.getCurrentDimensions().getFeature()).isEqualTo("user-v2");
+        assertThat(MDC.get("variant")).isEqualTo("new");
+        assertThat(MDC.get("feature.name")).isEqualTo("user-v2");
+        assertThat(MDC.get("feature.variant")).isEqualTo("new");
+
+        FlowContext.recordStep("step-sqs", TimeUnit.MILLISECONDS.toNanos(45));
+        FlowContext.complete(meterRegistry);
+
+        Timer workTimer = meterRegistry.find("observability.flow.component.work.duration")
+                .tag("flow", "user-registration-flow")
+                .tag("component", "step-sqs")
+                .tag("variant", "new")
+                .timer();
+        assertThat(workTimer).isNotNull();
+        assertThat(workTimer.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(45.0);
+
+        Timer attributedTimer = meterRegistry.find("observability.flow.component.attributed.duration")
+                .tag("flow", "user-registration-flow")
+                .tag("component", "step-sqs")
+                .tag("variant", "new")
+                .timer();
+        assertThat(attributedTimer).isNotNull();
+        assertThat(attributedTimer.totalTime(TimeUnit.MILLISECONDS)).isGreaterThan(0.0);
     }
 }

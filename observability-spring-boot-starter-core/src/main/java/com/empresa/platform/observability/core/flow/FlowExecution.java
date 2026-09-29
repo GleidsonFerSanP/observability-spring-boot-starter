@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * Modelo lógico e concorrente de execução de um Flow (Candidate Architecture v2 - Seção 7).
  * Seguro para acesso multi-thread durante execuções assíncronas/paralelas.
+ * Suporta dimensões canônicas de baixa cardinalidade (FlowDimensions).
  */
 public class FlowExecution {
 
@@ -20,9 +21,13 @@ public class FlowExecution {
     private long endNanos;
     private String outcome = "SUCCESS";
     private final Queue<StepExecution> stepExecutions = new ConcurrentLinkedQueue<>();
+    private final FlowDimensions dimensions = new FlowDimensions();
 
     public FlowExecution(String flowName) {
-        this(flowName, System.nanoTime());
+        this.flowId = UUID.randomUUID().toString();
+        this.flowName = flowName;
+        this.startNanos = System.nanoTime();
+        this.endNanos = 0;
     }
 
     public FlowExecution(String flowName, long customWallClockNanos) {
@@ -108,5 +113,33 @@ public class FlowExecution {
 
     public Collection<StepExecution> getStepExecutions() {
         return Collections.unmodifiableCollection(stepExecutions);
+    }
+
+    public FlowDimensions getDimensions() {
+        return dimensions;
+    }
+
+    public void setDimension(String key, String value) {
+        this.dimensions.setDimension(key, value);
+    }
+
+    public String getDimension(String key) {
+        return this.dimensions.getDimension(key);
+    }
+
+    public void setVariant(String variant) {
+        this.dimensions.setVariant(variant);
+    }
+
+    public String getVariant() {
+        return this.dimensions.getVariant();
+    }
+
+    public void setFeature(String feature) {
+        this.dimensions.setFeature(feature);
+    }
+
+    public String getFeature() {
+        return this.dimensions.getFeature();
     }
 }

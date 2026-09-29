@@ -20,6 +20,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import com.empresa.platform.observability.core.feature.FeatureEvaluationListener;
+import com.empresa.platform.observability.core.feature.FlowFeatureEvaluationListener;
 import org.springframework.context.annotation.Bean;
 
 import java.util.List;
@@ -125,5 +127,12 @@ public class ObservabilityAutoConfiguration {
     @ConditionalOnProperty(prefix = "observability.async-decorator", name = "enabled", havingValue = "true", matchIfMissing = true)
     public com.empresa.platform.observability.autoconfigure.async.ObservabilityTaskDecorator observabilityTaskDecorator() {
         return new com.empresa.platform.observability.autoconfigure.async.ObservabilityTaskDecorator();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(FeatureEvaluationListener.class)
+    public FlowFeatureEvaluationListener flowFeatureEvaluationListener(
+            @Autowired(required = false) ObservationRegistry observationRegistry) {
+        return new FlowFeatureEvaluationListener(observationRegistry);
     }
 }

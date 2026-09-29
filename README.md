@@ -1,59 +1,74 @@
 # Observability Spring Boot Starter
 
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.3-green.svg)](https://spring.io/projects/spring-boot)
-[![Micrometer](https://img.shields.io/badge/Micrometer-1.12.3-blue.svg)](https://micrometer.io/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.3+-green.svg)](https://spring.io/projects/spring-boot)
+[![Micrometer](https://img.shields.io/badge/Micrometer-1.12.3+-blue.svg)](https://micrometer.io/)
+[![Architecture](https://img.shields.io/badge/Spec-Candidate%20v2-purple.svg)](docs/ARCHITECTURE.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Starter corporativo padronizado para observabilidade completa em ecossistemas Spring Boot, implementando a especificação **Candidate v2**: **instrumentação automática por padrão** para infraestrutura e **instrumentação declarativa** apenas onde o framework não consegue inferir a semântica de negócio sozinho.
+Starter corporativo padronizado para observabilidade unificada em ecossistemas Spring Boot 3.x, desenvolvido sob a especificação técnica **Candidate Architecture v2**: **instrumentação automática por padrão** para toda infraestrutura técnica e **instrumentação declarativa** exclusivamente onde o framework não consegue inferir a semântica de negócio.
 
 ---
 
-## 🎯 Filosofia e Objetivos
+## 📚 Documentação Especializada
 
-Nenhuma aplicação de negócio deve precisar gerenciar programaticamente:
-- `MeterRegistry`, `Tracer`, `Timer.Sample`, `ObservationRegistry`
-- Criação e abertura de `Span` ou manipulação manual de `MDC`
-- Filtros manuais de extração e propagação de Correlation ID
-- Binders customizados e polling de fila/tópico por JVM
+| Documento | Descrição |
+|---|---|
+| 🏛️ **[Arquitetura do Starter](docs/ARCHITECTURE.md)** | Princípios de design, estrutura multi-módulo (`core`, `autoconfigure`, `starter`), auto-discovery condicional, diagramas de sequência de propagação de contexto assíncrono e formulação matemática da atribuição de latência. |
+| ⚙️ **[Referência de Configuração](docs/CONFIGURATION_REFERENCE.md)** | Catálogo completo de propriedades `observability.*`, chaves mestras e granulares (`observability.<feature>.enabled`), parametrização de SLAs, limiares de alarmística e exemplo de `application.yml`. |
+| 💡 **[Guia de Capacidades e Uso Prático](docs/CAPABILITIES_GUIDE.md)** | Guia de uso das anotações `@TrackFlow`, `@TrackStep`, `@LogLeg`, `@MaskField`, `@ObservationTag`, propagação de contexto assíncrono, barramento de eventos de alerta (`AlertDispatcher`) e segregação dimensional de feature flags. |
+| 📊 **[Esquema de Telemetria (Telemetry Schema)](docs/TELEMETRY_SCHEMA.md)** | Catálogo canônico de métricas dimensionais (`observability.flow.*`, `resilience4j.*`, `hikaricp.*`), chaves padronizadas de MDC (`correlation_id`, `traceId`, `variant`), esquemas de logs estruturados (`AUDIT_LEG_LOGGER`) e eventos de alerta. |
 
-### Princípio 80/20 de Observabilidade
+---
+
+## 🎯 Filosofia e Princípios
+
+Nenhuma aplicação de microsserviço de negócio deve precisar implementar:
+- Instanciação de `MeterRegistry`, `Tracer`, `Timer.Sample` ou `ObservationRegistry`.
+- Manipulação manual de `Span`, abertura de escopos ou limpeza de `MDC`.
+- Filtros manuais de extração e injeção de `X-Correlation-Id` ou W3C `traceparent`.
+- Binders customizados de monitoramento de filas, bancos de dados ou disjuntores.
+
+### O Princípio 80/20 de Observabilidade
 ```text
 80-95% da observabilidade
           ↓
-     Automática (HTTP, Feign, Kafka, SQS, JDBC, Hikari, Resilience4j, JVM)
+     Automática (HTTP, OpenFeign, Kafka, SQS, JDBC, HikariCP, Redis, Resilience4j, JVM, Logs)
 
 5-20% da observabilidade
           ↓
-  Semântica Declarativa (@TrackFlow, @TrackStep, @LogLeg, @ObservationTag)
+   Semântica Declarativa (@TrackFlow, @TrackStep, @LogLeg, @ObservationTag)
 ```
 
 ---
 
-## 🏗️ Arquitetura Multi-Módulo
-
-O starter adota a convenção canônica oficial do Spring Boot para criação de starters:
+## 🏗️ Estrutura Multi-Módulo (Padrão Spring Boot)
 
 ```text
-observability-spring-boot-starter-parent/
-├── observability-spring-boot-starter-core/          # Módulo puro, agnóstico de Spring Boot Starter
-│   ├── annotation/                                  # @TrackFlow, @TrackStep, @LogLeg, @ObservationTag
-│   ├── flow/                                        # FlowContext, LatencyAttributionEngine
+observability-spring-boot-starter-project/
+├── pom.xml                                          # Parent POM (BOM & dependências unificadas)
+│
+├── observability-spring-boot-starter-core/          # MÓDULO CORE (POJO / Framework-agnostic)
+│   ├── annotation/                                  # @TrackFlow, @TrackStep, @LogLeg, @ObservationTag, @MaskField
+│   ├── flow/                                        # FlowContext, LatencyAttributionEngine, FlowExecution, FlowDimensions
 │   ├── leg/                                         # LegContext, SpelMaskingService
 │   ├── correlation/                                 # CorrelationContext (W3C / MDC / HTTP Headers)
+│   ├── feature/                                     # FlowFeatureEvaluationListener (Feature flag SPI)
 │   └── alerting/                                    # AlertDispatcher, AlertEvent, AlertNotifier
 │
-├── observability-spring-boot-starter-autoconfigure/ # Configurações automáticas e Beans condicionais
+├── observability-spring-boot-starter-autoconfigure/ # MÓDULO AUTOCONFIGURE (Spring Boot AutoConfiguration)
 │   ├── aspect/                                      # FlowTrackingAspect, SpelObservationAspect, LegLoggingAspect
+│   ├── async/                                       # ObservabilityTaskDecorator (MDC & ContextSnapshot propagation)
 │   ├── alerting/                                    # LogAlertNotifier, WebhookAlertNotifier
-│   ├── feign/                                       # FeignObservabilityAutoConfiguration (Interceptors)
+│   ├── feign/                                       # FeignObservabilityAutoConfiguration
 │   ├── jdbc/                                        # JdbcObservabilityAutoConfiguration (HikariPoolAlertWatcher)
 │   ├── kafka/                                       # KafkaObservabilityAutoConfiguration
 │   ├── resilience/                                  # ResilienceObservabilityAutoConfiguration (CircuitBreakerAlertListener)
 │   ├── sqs/                                         # SqsObservabilityAutoConfiguration
-│   └── LoggingObservationHandler.java               # Formatação de logs estruturados de observation
+│   └── LoggingObservationHandler.java               # Formatação e logging estruturado de Observation
 │
-└── observability-spring-boot-starter/               # Dependência única (Fat Starter) que as aplicações importam
+└── observability-spring-boot-starter/               # STARTER AGREGADOR (Dependência única importada pelas apps)
+    └── pom.xml
 ```
 
 ---
@@ -62,7 +77,7 @@ observability-spring-boot-starter-parent/
 
 ### 1. Dependência Maven
 
-Adicione no `pom.xml` da aplicação:
+Basta adicionar a dependência agregadora no `pom.xml` da aplicação:
 
 ```xml
 <dependency>
@@ -86,99 +101,87 @@ observability:
       default-flow-sla-ms: 1000
       default-step-sla-ms: 500
       flow-slas:
-        "POST /payments": 800
+        "UserRegistration": 800
       step-slas:
-        "payment-gateway": 400
+        "step-validate-user": 200
       hikari-pending-threads: 5
       circuit-breaker-open: true
 ```
 
 ---
 
-## 📊 Matriz de Cobertura Automática vs Declarativa
+## 📊 Matriz de Cobertura de Capacidades
 
 | Componente | Nível | O que é coletado automaticamente |
 |---|---|---|
-| **Spring MVC REST** | Automática | Requisições HTTP, latência, status, URI sanitizada, exemplars e correlation ID |
-| **OpenFeign** | Automática | Latência externa, injeção de cabeçalhos de propagação (`X-Correlation-Id`, W3C traceparent) |
-| **JDBC / Hibernate** | Automática | Query execution spans, transações de banco de dados |
-| **HikariCP** | Automática | Conexões ativas, threads pendentes, timeout de conexão e alarmística reativa |
-| **Kafka** | Automática | Spans de envio do `KafkaTemplate`, propagação de correlation ID nos records |
-| **AWS SQS** | Automática | Spans de envio do `SqsTemplate`, propagação de correlation ID nas mensagens |
-| **Resilience4j** | Automática | Circuit Breaker state changes (OPEN/HALF_OPEN), métricas de chamadas |
-| **Subprocessos de Negócio** | Declarativa (`@TrackStep`) | Latência atribuída semântica, SLA guard, cálculo de tempo de trabalho vs espera |
-| **Entrypoints Semânticos** | Declarativa (`@TrackFlow`) | Nome de fluxo de alto nível quando diferente do caminho REST cru |
-| **Auditoria e LGPD** | Declarativa (`@LogLeg`) | Per-leg logging seguro com mascaramento granular via SpEL (Email, CPF, Cartão, Senha) |
-| **Tags de Negócio** | Declarativa (`@ObservationTag`)| Extração dinâmica de tags de contexto a partir de argumentos ou retornos do método |
-
----
-
-## 🏷️ Exemplos de Instrumentação Declarativa
-
-### 1. Delimitação de Subprocesso com `@TrackStep`
-```java
-@Service
-public class RiskService {
-
-    @TrackStep("risk-calculation")
-    public RiskAssessment calculateRisk(Customer customer) {
-        // O starter mede a latência dessa etapa, calcula o tempo atribuído se houver paralelismo,
-        // valida o SLA e emite alertas se a duração estourar o limiar.
-        return doCalculate(customer);
-    }
-}
-```
-
-### 2. Enriquecimento de Contexto via SpEL com `@ObservationTag`
-```java
-@TrackStep("billing-verification")
-@ObservationTag(key = "userId", expression = "#userId", highCardinality = true)
-@ObservationTag(key = "plan", expression = "#result?.plan()")
-public BillingDto getBilling(String userId) {
-    return billingClient.fetch(userId);
-}
-```
-
-### 3. Auditoria de Pernas e Mascaramento LGPD com `@LogLeg`
-```java
-@PostMapping("/users")
-@TrackFlow("UserRegistration")
-@LogLeg(
-    target = "user-orchestrator",
-    type = LegType.INBOUND,
-    mask = {
-        @MaskField(expression = "#request.email", pattern = MaskPattern.EMAIL_PARTIAL),
-        @MaskField(expression = "#request.taxId", pattern = MaskPattern.CPF_PARTIAL)
-    }
-)
-public ResponseEntity<UserResponse> register(@RequestBody UserRequest request) {
-    return ResponseEntity.ok(userService.register(request));
-}
-```
+| **Spring MVC REST** | Automática | Requisições HTTP, status, latência percentil (P95/P99), Correlation ID, propagação W3C TraceContext. |
+| **OpenFeign** | Automática | Latência externa, injeção transparente de headers de correlação (`X-Correlation-Id`, `traceparent`). |
+| **JDBC / Hibernate** | Automática | Spans de execução SQL e tempo transacional. |
+| **HikariCP** | Automática | Métricas de conexões ativas, idle e sentinela de esgotamento (`DATABASE_POOL_STARVATION`). |
+| **Kafka (Producer/Consumer)** | Automática | Métricas de envio e consumo, injeção de correlation ID nos records. |
+| **AWS SQS** | Automática | Interceptor de mensagens, métricas de envio e correlação. |
+| **Resilience4j** | Automática | Monitoramento de transições de estado do Circuit Breaker (`OPEN`, `HALF_OPEN`) com alertas imediatos. |
+| **Subprocessos de Negócio** | Declarativa (`@TrackStep`) | Latência de esforço nominal vs atribuída no tempo de relógio, controle de SLA de subprocesso. |
+| **Fluxos Semânticos** | Declarativa (`@TrackFlow`) | Delimitação de orquestrações de negócio ponta a ponta e governança de interrupções. |
+| **Auditoria Forense & LGPD** | Declarativa (`@LogLeg`) | Per-leg logging com mascaramento automático de dados sensíveis via SpEL (`@MaskField`). |
+| **Tags Dinâmicas** | Declarativa (`@ObservationTag`) | Extração dinâmica de dimensões semânticas a partir de argumentos e retornos com SpEL. |
 
 ---
 
 ## 🧮 Motor de Atribuição de Latência (`LatencyAttributionEngine`)
 
-Para resolver a distorção matemática de agregação simples em fluxos concorrentes (`CompletableFuture.allOf`), o starter implementa o modelo canônico de três métricas de latência:
+Para resolver distorções matemáticas em fluxos que disparam subprocessos paralelos (`CompletableFuture.allOf`), o starter implementa o modelo de 3 métricas canônicas:
 
-1. **`flow.duration` (Wall-clock time)**: Tempo real decorrido de ponta a ponta na perspectiva do usuário.
-2. **`flow.component.work.duration`**: Soma estrita de CPU e trabalho real de cada componente ou thread.
-3. **`flow.component.attributed.duration`**: Latência normalizada ponderada sobre o tempo de relógio do fluxo, garantindo que a decomposição percentual feche sempre exatamente em 100%.
+```mermaid
+flowchart TD
+    Total["observability.flow.duration (Wall-Clock Total)"]
+    Attr["observability.flow.component.attributed.duration (Normalizado <= 100%)"]
+    Work["observability.flow.component.work.duration (Esforço Nominal Bruto)"]
+    Unattr["observability.flow.unattributed.duration (Processamento interno / Overhead)"]
+    Overlap["observability.flow.parallel.overlap.duration (Tempo poupado por concorrência)"]
+
+    Total --> Attr
+    Total --> Unattr
+    Work --> Overlap
+```
+
+- **Invariante Matemática do Wall-Clock**:
+  $$\sum \text{attributed\_duration} + \text{unattributed\_duration} = \text{wall\_clock\_duration}$$
+- Em fluxos com subprocessos concorrentes, a soma simples dos tempos nominais ultrapassa o tempo de relógio. O motor calcula a sobreposição paralela (`parallel.overlap.duration`) e normaliza a contribuição atribuída de cada componente.
 
 ---
 
-## 🛡️ Alarmística Reativa In-App (`AlertDispatcher`)
+## 🛡️ Desativação Limpa (Master Switch & Toggles)
 
-O starter monitora anomalias em tempo sub-segundo diretamente no ciclo de vida da JVM:
-- **`FLOW_LATENCY_SLA_BREACH`**: Quando a duração de um `@TrackFlow` viola o SLA configurado.
-- **`INTEGRATION_LATENCY_SLA_BREACH`**: Quando um `@TrackStep` excede seu limiar individual.
-- **`CIRCUIT_BREAKER_OPEN`**: Transições imediatas de disjuntores Resilience4j.
-- **`HIKARICP_POOL_EXHAUSTION`**: Quando threads aguardando conexões no HikariCP superam o limite de segurança.
+O starter pode ser totalmente desativado ou desabilitado seletivamente sem que nenhuma linha de código da aplicação sofra alteração:
 
-Os alertas são despachados de forma desacoplada para log estruturado JSON, webhooks corporativos assíncronos e exportados como contadores Prometheus (`alerts_triggered_total`).
+```yaml
+# Desliga 100% dos aspectos, filtros e watchers:
+observability:
+  enabled: false
+```
+
+Ou com controle granular por funcionalidade:
+
+```yaml
+observability:
+  enabled: true
+  feign:
+    enabled: false      # Desabilita apenas interceptor Feign
+  leg-logging:
+    enabled: false      # Desabilita apenas auditoria @LogLeg
+  alerting:
+    enabled: false      # Desabilita apenas despacho de alarmística
+```
+
+---
+
+## 🧪 Suporte a Testes & Ambientes Locais
+
+Para suíte de testes de integração (`@SpringBootTest`), o starter respeita a injeção condicional de mocks e desabilitações seletivas, garantindo tempo de boot ultrarrápido sem dependência de coletores externos.
 
 ---
 
 ## 📄 Licença
-Distribuído sob a licença Apache 2.0.
+
+Distribuído sob a licença [Apache 2.0](LICENSE).
