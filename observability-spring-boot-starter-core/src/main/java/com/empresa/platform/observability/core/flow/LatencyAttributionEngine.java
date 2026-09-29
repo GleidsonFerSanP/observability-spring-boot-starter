@@ -18,6 +18,25 @@ import java.util.concurrent.TimeUnit;
  */
 public class LatencyAttributionEngine {
 
+    public static void recordAttributions(FlowExecution flowExecution, MeterRegistry registry) {
+        if (flowExecution == null || registry == null) {
+            return;
+        }
+        Map<String, Long> stepDurations = new java.util.LinkedHashMap<>();
+        Map<String, String> stepTypes = new java.util.LinkedHashMap<>();
+        for (StepExecution step : flowExecution.getStepExecutions()) {
+            stepDurations.merge(step.getStepName(), step.getDurationNanos(), Long::sum);
+            stepTypes.putIfAbsent(step.getStepName(), step.getType());
+        }
+        recordAttributions(
+                flowExecution.getFlowName(),
+                flowExecution.getWallClockDurationNanos(),
+                stepDurations,
+                stepTypes,
+                registry
+        );
+    }
+
     public static void recordAttributions(
             String flowName,
             long wallClockNanos,
@@ -30,8 +49,13 @@ public class LatencyAttributionEngine {
         }
 
         long sumWorkNanos = 0;
-        for (Long d : stepDurations.values()) {
-            sumWorkNanos += d;
+        for (Map.Entry<String, Long> entry : stepDurations.entrySet()) {
+            String component = entry.getKey();
+            long workDuration = entry.getValue();
+            String type = stepTypes.getOrDefault(component, "INTERNAL");
+            sumWorkNanos += workDuration;
+
+            recordWorkMetric(registry, flowName, component, type, workDuration);
         }
 
         if (sumWorkNanos <= wallClockNanos) {
@@ -75,6 +99,22 @@ public class LatencyAttributionEngine {
                     .register(registry)
                     .record(overlapNanos, TimeUnit.NANOSECONDS);
         }
+    }
+
+    private static void recordWorkMetric(
+            MeterRegistry registry,
+            String flowName,
+            String component,
+            String type,
+            long durationNanos
+    ) {
+        Timer.builder("observability.flow.component.work.duration")
+                .tag("flow", flowName)
+                .tag("component", component)
+                .tag("type", type)
+                .description("Duração real de trabalho do componente independente de paralelismo")
+                .register(registry)
+                .record(durationNanos, TimeUnit.NANOSECONDS);
     }
 
     private static void recordAttributedMetric(

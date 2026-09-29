@@ -191,4 +191,8 @@ public class FlowContext {
             LatencyAttributionEngine.recordAttributions(context.flowName, totalNanos, context.stepDurations, context.stepTypes, registry);
         }
     }
+
+    public static void clear() {
+        CURRENT_FLOW.remove();
+    }
 }

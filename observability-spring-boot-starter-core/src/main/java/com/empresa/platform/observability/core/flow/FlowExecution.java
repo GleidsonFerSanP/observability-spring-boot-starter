@@ -22,9 +22,22 @@ public class FlowExecution {
     private final Queue<StepExecution> stepExecutions = new ConcurrentLinkedQueue<>();
 
     public FlowExecution(String flowName) {
+        this(flowName, System.nanoTime());
+    }
+
+    public FlowExecution(String flowName, long customWallClockNanos) {
         this.flowId = UUID.randomUUID().toString();
         this.flowName = flowName;
-        this.startNanos = System.nanoTime();
+        this.startNanos = 0;
+        this.endNanos = customWallClockNanos;
+    }
+
+    public void recordStep(String stepName, long durationNanos) {
+        recordStep(stepName, com.empresa.platform.observability.core.annotation.ComponentType.INTERNAL, durationNanos);
+    }
+
+    public void recordStep(String stepName, com.empresa.platform.observability.core.annotation.ComponentType type, long durationNanos) {
+        stepExecutions.add(new StepExecution(stepName, type, 0, durationNanos));
     }
 
     public void addStepExecution(StepExecution step) {

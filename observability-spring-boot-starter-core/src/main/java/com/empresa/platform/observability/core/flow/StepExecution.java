@@ -22,8 +22,21 @@ public class StepExecution {
     private int retryAttempt;
     private final Map<String, String> attributes = new ConcurrentHashMap<>();
 
+    public StepExecution(String component, long durationNanos) {
+        this(component, ComponentType.INTERNAL, 0, durationNanos);
+    }
+
     public StepExecution(String component, ComponentType componentType, long startNanos) {
         this(UUID.randomUUID().toString(), null, component, componentType, startNanos);
+    }
+
+    public StepExecution(String component, ComponentType componentType, long startNanos, long endNanos) {
+        this.stepId = UUID.randomUUID().toString();
+        this.parentStepId = null;
+        this.component = component;
+        this.componentType = componentType != null ? componentType : ComponentType.INTERNAL;
+        this.startNanos = startNanos;
+        this.endNanos = endNanos;
     }
 
     public StepExecution(String stepId, String parentStepId, String component, ComponentType componentType, long startNanos) {
@@ -33,6 +46,14 @@ public class StepExecution {
         this.componentType = componentType != null ? componentType : ComponentType.INTERNAL;
         this.startNanos = startNanos;
         this.endNanos = startNanos;
+    }
+
+    public String getStepName() {
+        return component;
+    }
+
+    public String getType() {
+        return componentType != null ? componentType.name() : "INTERNAL";
     }
 
     public void complete(long endNanos, String outcome) {
