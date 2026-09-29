@@ -1,0 +1,5 @@
+com/empresa/platform/observability/core/annotation/TrackStep.class
+com/empresa/platform/observability/core/annotation/ObservationTag.class
+com/empresa/platform/observability/core/annotation/ObservationTags.class
+com/empresa/platform/observability/core/annotation/LogLeg.class
+com/empresa/platform/observability/core/annotation/TrackFlow.class

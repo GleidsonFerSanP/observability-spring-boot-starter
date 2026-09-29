@@ -1,0 +1,5 @@
+/Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-core/src/main/java/com/empresa/platform/observability/core/annotation/ObservationTags.java
+/Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-core/src/main/java/com/empresa/platform/observability/core/annotation/ObservationTag.java
+/Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-core/src/main/java/com/empresa/platform/observability/core/annotation/LogLeg.java
+/Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-core/src/main/java/com/empresa/platform/observability/core/annotation/TrackStep.java
+/Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-core/src/main/java/com/empresa/platform/observability/core/annotation/TrackFlow.java

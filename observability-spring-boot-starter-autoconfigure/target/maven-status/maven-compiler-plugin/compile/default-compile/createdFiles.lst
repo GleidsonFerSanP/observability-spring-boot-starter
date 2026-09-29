@@ -1,0 +1,7 @@
+com/empresa/platform/observability/autoconfigure/FeignObservabilityAutoConfiguration.class
+com/empresa/platform/observability/autoconfigure/JdbcObservabilityAutoConfiguration.class
+com/empresa/platform/observability/autoconfigure/RedisObservabilityAutoConfiguration.class
+com/empresa/platform/observability/autoconfigure/ResilienceObservabilityAutoConfiguration.class
+com/empresa/platform/observability/autoconfigure/ObservabilityAutoConfiguration.class
+com/empresa/platform/observability/autoconfigure/KafkaObservabilityAutoConfiguration.class
+com/empresa/platform/observability/autoconfigure/SqsObservabilityAutoConfiguration.class
