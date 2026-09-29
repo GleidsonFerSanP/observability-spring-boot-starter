@@ -17,6 +17,7 @@ public class ResilienceObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.resilience", name = "enabled", havingValue = "true", matchIfMissing = true)
     public CircuitBreakerAlertListener circuitBreakerAlertListener(@Autowired(required = false) AlertDispatcher alertDispatcher) {
         return new CircuitBreakerAlertListener(alertDispatcher);
     }

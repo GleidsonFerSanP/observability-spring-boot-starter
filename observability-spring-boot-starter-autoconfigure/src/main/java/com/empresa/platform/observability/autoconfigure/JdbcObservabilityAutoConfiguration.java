@@ -20,6 +20,7 @@ public class JdbcObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.jdbc", name = "enabled", havingValue = "true", matchIfMissing = true)
     public HikariPoolAlertWatcher hikariPoolAlertWatcher(
             @Autowired(required = false) MeterRegistry meterRegistry,
             @Autowired(required = false) AlertDispatcher alertDispatcher,

@@ -45,6 +45,7 @@ public class ObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.alerting", name = "enabled", havingValue = "true", matchIfMissing = true)
     public AlertDispatcher alertDispatcher(
             AlertingProperties alertingProperties,
             @Autowired(required = false) List<AlertNotifier> notifiers,
@@ -55,6 +56,7 @@ public class ObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(name = "logAlertNotifier")
+    @ConditionalOnProperty(prefix = "observability.alerting", name = "enabled", havingValue = "true", matchIfMissing = true)
     public LogAlertNotifier logAlertNotifier() {
         return new LogAlertNotifier();
     }
@@ -71,6 +73,7 @@ public class ObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.flow-tracking", name = "enabled", havingValue = "true", matchIfMissing = true)
     public FlowTrackingAspect flowTrackingAspect(
             @Autowired(required = false) MeterRegistry meterRegistry,
             @Autowired(required = false) ObservationRegistry observationRegistry,
@@ -87,12 +90,14 @@ public class ObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.spel-observation", name = "enabled", havingValue = "true", matchIfMissing = true)
     public SpelObservationAspect spelObservationAspect(@Autowired(required = false) ObservationRegistry observationRegistry) {
         return new SpelObservationAspect(observationRegistry != null ? observationRegistry : ObservationRegistry.NOOP);
     }
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.leg-logging", name = "enabled", havingValue = "true", matchIfMissing = true)
     public LegLoggingAspect legLoggingAspect(
             SpelMaskingService spelMaskingService,
             @Autowired(required = false) ObjectMapper objectMapper
@@ -102,6 +107,7 @@ public class ObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.observation-handler", name = "enabled", havingValue = "true", matchIfMissing = true)
     public LoggingObservationHandler loggingObservationHandler() {
         return new LoggingObservationHandler();
     }
@@ -109,12 +115,14 @@ public class ObservabilityAutoConfiguration {
     @Bean
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.correlation", name = "enabled", havingValue = "true", matchIfMissing = true)
     public CorrelationIdFilter correlationIdFilter() {
         return new CorrelationIdFilter();
     }
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "observability.async-decorator", name = "enabled", havingValue = "true", matchIfMissing = true)
     public com.empresa.platform.observability.autoconfigure.async.ObservabilityTaskDecorator observabilityTaskDecorator() {
         return new com.empresa.platform.observability.autoconfigure.async.ObservabilityTaskDecorator();
     }

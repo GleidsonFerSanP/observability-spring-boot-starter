@@ -17,6 +17,7 @@ public class FeignObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(name = "observabilityFeignRequestInterceptor")
+    @ConditionalOnProperty(prefix = "observability.feign", name = "enabled", havingValue = "true", matchIfMissing = true)
     public RequestInterceptor observabilityFeignRequestInterceptor() {
         return (RequestTemplate requestTemplate) -> {
             String correlationId = CorrelationContext.generateOrGet();
