@@ -50,6 +50,7 @@ observability-spring-boot-starter-project/
 │
 ├── observability-spring-boot-starter-core/          # MÓDULO CORE (POJO / Framework-agnostic)
 │   ├── annotation/                                  # @TrackFlow, @TrackStep, @LogLeg, @ObservationTag, @MaskField
+│   ├── engine/                                      # ObservabilityEngine SPI, EngineCapabilities, Datadog & Micrometer Engines
 │   ├── flow/                                        # FlowContext, LatencyAttributionEngine, FlowExecution, FlowDimensions
 │   ├── leg/                                         # LegContext, SpelMaskingService
 │   ├── correlation/                                 # CorrelationContext (W3C / MDC / HTTP Headers)

@@ -161,3 +161,26 @@ public class SlackAlertNotifier implements AlertNotifier {
     }
 }
 ```
+
+---
+
+## 7. Arquitetura Hexagonal de Engines (`ObservabilityEngine` & Datadog Oficial)
+
+O starter adota o padrão **Ports & Adapters**, desacoplando anotações e modelos da plataforma dos backends de telemetria específicos.
+
+### Seleção Declarativa de Engine:
+No `application.yml` de produção (ou via variável de ambiente `OBSERVABILITY_ENGINE=datadog`):
+
+```yaml
+observability:
+  engine: datadog # datadog (produção) | micrometer (local/testes)
+```
+
+### O que o `DatadogObservabilityEngine` entrega nativamente:
+1. **Request Flow Maps Dinâmicos**: Injeta tags de span (`flow.name`, `flow.variant`, `flow.step`, `flow.status`, `feature.name`, `feature.variant`) que permitem ao Datadog Trace Explorer projetar e comparar visualmente caminhos de rotas e migrações operacionais.
+2. **Supressão de Polling in-JVM com Data Streams Monitoring (DSM)**:
+   - Reporta `requiresInJvmLagPolling() == false`.
+   - Com o `dd-java-agent` ativo com `-Ddd.data.streams.enabled=true`, o Datadog monitora a latência de ponta a ponta (pathway latency) e o lag de mensageria diretamente nos brokers e filas, eliminando consultas repetitivas de polling in-JVM via `AdminClient` ou `GetQueueAttributes`.
+3. **Ponte Não-Intrusiva OpenTelemetry**:
+   - Injeta atributos de span via `OtelSpanBridge` capturados automaticamente pelo Datadog Java Agent via `DD_TRACE_OTEL_ENABLED=true`, sem exigir nenhum jar fechado ou proprietário no classpath da aplicação.
+

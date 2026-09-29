@@ -18,13 +18,20 @@ public class FlowFeatureEvaluationListener implements FeatureEvaluationListener 
 
     private static final Logger log = LoggerFactory.getLogger(FlowFeatureEvaluationListener.class);
     private final ObservationRegistry observationRegistry;
+    private final com.empresa.platform.observability.core.engine.ObservabilityEngine observabilityEngine;
 
     public FlowFeatureEvaluationListener() {
-        this(null);
+        this(null, null);
     }
 
     public FlowFeatureEvaluationListener(ObservationRegistry observationRegistry) {
+        this(observationRegistry, null);
+    }
+
+    public FlowFeatureEvaluationListener(ObservationRegistry observationRegistry,
+                                         com.empresa.platform.observability.core.engine.ObservabilityEngine observabilityEngine) {
         this.observationRegistry = observationRegistry;
+        this.observabilityEngine = observabilityEngine;
     }
 
     @Override
@@ -52,8 +59,13 @@ public class FlowFeatureEvaluationListener implements FeatureEvaluationListener 
         MDC.put("feature.name", featureName);
         MDC.put("feature.variant", variant);
 
-        // 3. Propagar para a Observation corrente se disponível
-        if (observationRegistry != null) {
+        // 3. Propagar para a Engine ativa ou Observation corrente
+        if (observabilityEngine != null) {
+            observabilityEngine.tagAttribute("variant", variant);
+            observabilityEngine.tagAttribute("feature", featureName);
+            observabilityEngine.tagAttribute("feature.name", featureName);
+            observabilityEngine.tagAttribute("feature.variant", variant);
+        } else if (observationRegistry != null) {
             Observation currentObservation = observationRegistry.getCurrentObservation();
             if (currentObservation != null) {
                 currentObservation.lowCardinalityKeyValue("variant", variant);

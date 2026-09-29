@@ -7,10 +7,13 @@ import com.empresa.platform.observability.core.alerting.AlertType;
 import com.empresa.platform.observability.core.alerting.AlertingProperties;
 import com.empresa.platform.observability.core.annotation.TrackFlow;
 import com.empresa.platform.observability.core.annotation.TrackStep;
+import com.empresa.platform.observability.core.engine.FlowScope;
+import com.empresa.platform.observability.core.engine.MicrometerObservabilityEngine;
+import com.empresa.platform.observability.core.engine.ObservabilityEngine;
+import com.empresa.platform.observability.core.engine.StepScope;
 import com.empresa.platform.observability.core.flow.FlowContext;
 import com.empresa.platform.observability.core.flow.FlowExecution;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -25,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 @Order(1)
 public class FlowTrackingAspect {
 
+    private final ObservabilityEngine observabilityEngine;
     private final MeterRegistry meterRegistry;
     private final ObservationRegistry observationRegistry;
     private final AlertDispatcher alertDispatcher;
@@ -34,8 +38,20 @@ public class FlowTrackingAspect {
                               ObservationRegistry observationRegistry,
                               AlertDispatcher alertDispatcher,
                               AlertingProperties alertingProperties) {
+        this(new MicrometerObservabilityEngine(observationRegistry, meterRegistry),
+                meterRegistry, observationRegistry, alertDispatcher, alertingProperties);
+    }
+
+    public FlowTrackingAspect(ObservabilityEngine observabilityEngine,
+                              MeterRegistry meterRegistry,
+                              ObservationRegistry observationRegistry,
+                              AlertDispatcher alertDispatcher,
+                              AlertingProperties alertingProperties) {
+        this.observabilityEngine = observabilityEngine != null
+                ? observabilityEngine
+                : new MicrometerObservabilityEngine(observationRegistry, meterRegistry);
         this.meterRegistry = meterRegistry;
-        this.observationRegistry = observationRegistry;
+        this.observationRegistry = observationRegistry != null ? observationRegistry : ObservationRegistry.NOOP;
         this.alertDispatcher = alertDispatcher;
         this.alertingProperties = alertingProperties != null ? alertingProperties : new AlertingProperties();
     }
@@ -48,38 +64,23 @@ public class FlowTrackingAspect {
             flowName = joinPoint.getSignature().toShortString();
         }
 
-        Observation flowObservation = Observation.createNotStarted("flow." + sanitizeName(flowName), observationRegistry)
-                .lowCardinalityKeyValue("flow", flowName)
-                .lowCardinalityKeyValue("flow.type", trackFlow.type())
-                .contextualName(flowName)
-                .start();
-
         FlowContext.start(flowName);
-        try (Observation.Scope scope = flowObservation.openScope()) {
+        FlowScope flowScope = observabilityEngine.startFlow(flowName, trackFlow.type(), FlowContext.getCurrentDimensions());
+
+        try {
             Object result = joinPoint.proceed();
             if (FlowContext.hasInterruption()) {
-                flowObservation.lowCardinalityKeyValue("flow.status", "DEGRADED_FALLBACK");
-                flowObservation.highCardinalityKeyValue("flow.failed_step", FlowContext.getFailedStep());
+                flowScope.markDegraded(FlowContext.getFailedStep());
             } else {
-                flowObservation.lowCardinalityKeyValue("flow.status", "SUCCESS");
+                flowScope.markSuccess();
             }
             return result;
         } catch (Throwable t) {
-            flowObservation.error(t);
-            flowObservation.lowCardinalityKeyValue("flow.status", "INTERRUPTED");
-            flowObservation.highCardinalityKeyValue("error.class", t.getClass().getName());
-            flowObservation.highCardinalityKeyValue("error.message", t.getMessage() != null ? t.getMessage() : "null");
+            observabilityEngine.recordFlowInterruption(flowName, FlowContext.getFailedStep(), t, FlowContext.getCurrentDimensions(), flowScope);
             throw t;
         } finally {
             FlowExecution execution = FlowContext.getCurrentExecution();
-            if (execution != null) {
-                for (Map.Entry<String, String> entry : execution.getDimensions().asMap().entrySet()) {
-                    flowObservation.lowCardinalityKeyValue(entry.getKey(), entry.getValue());
-                }
-            }
-
-            FlowContext.complete(meterRegistry);
-            flowObservation.stop();
+            observabilityEngine.completeFlow(execution, flowScope);
 
             MDC.remove("variant");
             MDC.remove("feature.name");
@@ -113,27 +114,12 @@ public class FlowTrackingAspect {
         }
         String currentFlow = FlowContext.getCurrentFlowName();
 
-        Observation stepObservation = Observation.createNotStarted("step." + sanitizeName(stepName), observationRegistry)
-                .lowCardinalityKeyValue("flow", currentFlow)
-                .lowCardinalityKeyValue("step", stepName)
-                .lowCardinalityKeyValue("step.type", trackStep.type())
-                .contextualName(stepName);
+        StepScope stepScope = observabilityEngine.startStep(currentFlow, stepName, trackStep.type(), FlowContext.getCurrentDimensions());
 
-        String currentVariant = FlowContext.getCurrentDimensions().getVariant();
-        if (currentVariant != null) {
-            stepObservation.lowCardinalityKeyValue("variant", currentVariant);
-        }
-        stepObservation.start();
-
-        try (Observation.Scope scope = stepObservation.openScope()) {
+        try {
             return joinPoint.proceed();
         } catch (Throwable t) {
-            stepObservation.error(t);
-            stepObservation.lowCardinalityKeyValue("step.status", "FAILED");
-            stepObservation.highCardinalityKeyValue("error.class", t.getClass().getName());
-            stepObservation.highCardinalityKeyValue("error.message", t.getMessage() != null ? t.getMessage() : "null");
-
-            FlowContext.recordInterruption(stepName, t, meterRegistry);
+            observabilityEngine.recordStepInterruption(currentFlow, stepName, t, FlowContext.getCurrentDimensions(), stepScope);
 
             if (alertDispatcher != null) {
                 alertDispatcher.dispatch(AlertEvent.of(
@@ -157,8 +143,7 @@ public class FlowTrackingAspect {
             throw t;
         } finally {
             long duration = System.nanoTime() - startNanos;
-            FlowContext.recordStep(stepName, trackStep.type(), duration);
-            stepObservation.stop();
+            observabilityEngine.completeStep(currentFlow, stepName, trackStep.type(), duration, FlowContext.getCurrentDimensions(), stepScope);
 
             long stepDurationMs = TimeUnit.NANOSECONDS.toMillis(duration);
             long stepThresholdMs = alertingProperties.getThresholdForStep(stepName);
@@ -177,10 +162,5 @@ public class FlowTrackingAspect {
                 ));
             }
         }
-    }
-
-    private String sanitizeName(String value) {
-        if (value == null) return "unknown";
-        return value.toLowerCase().replaceAll("[^a-z0-9]+", ".").replaceAll("^\\.+|\\.+$", "");
     }
 }

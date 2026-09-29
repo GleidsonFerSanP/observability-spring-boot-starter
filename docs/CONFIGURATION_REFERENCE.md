@@ -11,6 +11,7 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 | Propriedade | Tipo | Padrão | Descrição |
 |---|---|---|---|
 | `observability.enabled` | `boolean` | `true` | **Master Switch**. Quando `false`, inibe 100% dos aspectos, interceptores, filtros e listeners do starter na JVM. |
+| `observability.engine` | `String` | `micrometer` | **Engine de Telemetria**. Seleciona o adaptador da SPI (`micrometer` \| `datadog` \| `opentelemetry`). Em produção sob Datadog APM/DSM, definir como `datadog`. Em local/CI, manter `micrometer`. |
 | `observability.flow-tracking.enabled` | `boolean` | `true` | Ativa/desativa o aspecto `@TrackFlow` e a instrumentação de decomposição de latência do `FlowTrackingAspect`. |
 | `observability.leg-logging.enabled` | `boolean` | `true` | Ativa/desativa a auditoria estruturada forense de pernas (`AUDIT_LEG_LOGGER`) e o aspecto `@LogLeg`. |
 | `observability.spel-observation.enabled` | `boolean` | `true` | Ativa/desativa a extração dinâmica de tags via SpEL através do aspecto `SpelObservationAspect`. |
@@ -48,6 +49,7 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 # ==============================================================================
 observability:
   enabled: true # Master switch
+  engine: micrometer # micrometer (dev/test) | datadog (prod) | opentelemetry
 
   # Toggles Granulares (opcional, todos são true por padrão)
   flow-tracking:

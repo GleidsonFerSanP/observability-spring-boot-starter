@@ -145,4 +145,27 @@ class ObservabilityAutoConfigurationTest {
                             .isSameAs(context.getBean("customAlertDispatcher"));
                 });
     }
+
+    @Test
+    @DisplayName("Engine Selection: Padrão é MicrometerObservabilityEngine")
+    void shouldRegisterMicrometerEngineByDefault() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(com.empresa.platform.observability.core.engine.ObservabilityEngine.class);
+            assertThat(context.getBean(com.empresa.platform.observability.core.engine.ObservabilityEngine.class))
+                    .isInstanceOf(com.empresa.platform.observability.core.engine.MicrometerObservabilityEngine.class);
+        });
+    }
+
+    @Test
+    @DisplayName("Engine Selection: observability.engine=datadog ativa DatadogObservabilityEngine")
+    void shouldRegisterDatadogEngineWhenConfigured() {
+        contextRunner.withPropertyValues("observability.engine=datadog")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(com.empresa.platform.observability.core.engine.ObservabilityEngine.class);
+                    assertThat(context.getBean(com.empresa.platform.observability.core.engine.ObservabilityEngine.class))
+                            .isInstanceOf(com.empresa.platform.observability.core.engine.DatadogObservabilityEngine.class);
+                    assertThat(context.getBean(com.empresa.platform.observability.core.engine.ObservabilityEngine.class).getCapabilities().supportsRequestFlowMap())
+                            .isTrue();
+                });
+    }
 }

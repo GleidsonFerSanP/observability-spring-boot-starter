@@ -26,12 +26,25 @@ public class ObservabilityProperties {
     @NestedConfigurationProperty
     private AlertingProperties alerting = new AlertingProperties();
 
+    /**
+     * Engine de observabilidade ativa (micrometer | datadog | opentelemetry). Padrão é micrometer.
+     */
+    private String engine = "micrometer";
+
     public boolean isEnabled() {
         return enabled;
     }
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getEngine() {
+        return engine;
+    }
+
+    public void setEngine(String engine) {
+        this.engine = engine;
     }
 
     public boolean isFlowTrackingEnabled() {

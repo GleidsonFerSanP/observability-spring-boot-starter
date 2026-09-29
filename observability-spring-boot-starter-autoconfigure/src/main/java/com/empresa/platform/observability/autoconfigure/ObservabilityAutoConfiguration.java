@@ -22,6 +22,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import com.empresa.platform.observability.core.feature.FeatureEvaluationListener;
 import com.empresa.platform.observability.core.feature.FlowFeatureEvaluationListener;
+import com.empresa.platform.observability.core.engine.DatadogObservabilityEngine;
+import com.empresa.platform.observability.core.engine.MicrometerObservabilityEngine;
+import com.empresa.platform.observability.core.engine.ObservabilityEngine;
 import org.springframework.context.annotation.Bean;
 
 import java.util.List;
@@ -74,15 +77,31 @@ public class ObservabilityAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(ObservabilityEngine.class)
+    public ObservabilityEngine observabilityEngine(
+            ObservabilityProperties properties,
+            @Autowired(required = false) ObservationRegistry observationRegistry,
+            @Autowired(required = false) MeterRegistry meterRegistry
+    ) {
+        ObservationRegistry obsReg = observationRegistry != null ? observationRegistry : ObservationRegistry.NOOP;
+        if ("datadog".equalsIgnoreCase(properties.getEngine())) {
+            return new DatadogObservabilityEngine(obsReg, meterRegistry);
+        }
+        return new MicrometerObservabilityEngine(obsReg, meterRegistry);
+    }
+
+    @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "observability.flow-tracking", name = "enabled", havingValue = "true", matchIfMissing = true)
     public FlowTrackingAspect flowTrackingAspect(
+            ObservabilityEngine observabilityEngine,
             @Autowired(required = false) MeterRegistry meterRegistry,
             @Autowired(required = false) ObservationRegistry observationRegistry,
             @Autowired(required = false) AlertDispatcher alertDispatcher,
             AlertingProperties alertingProperties
     ) {
         return new FlowTrackingAspect(
+                observabilityEngine,
                 meterRegistry,
                 observationRegistry != null ? observationRegistry : ObservationRegistry.NOOP,
                 alertDispatcher,
@@ -132,7 +151,8 @@ public class ObservabilityAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(FeatureEvaluationListener.class)
     public FlowFeatureEvaluationListener flowFeatureEvaluationListener(
-            @Autowired(required = false) ObservationRegistry observationRegistry) {
-        return new FlowFeatureEvaluationListener(observationRegistry);
+            @Autowired(required = false) ObservationRegistry observationRegistry,
+            @Autowired(required = false) ObservabilityEngine observabilityEngine) {
+        return new FlowFeatureEvaluationListener(observationRegistry, observabilityEngine);
     }
 }

@@ -16,10 +16,26 @@ public class FlowDimensions {
 
     public static final String VARIANT_KEY = "variant";
     public static final String FEATURE_KEY = "feature";
+    public static final String EXPERIMENT_KEY = "experiment";
 
     private final Map<String, String> dimensions = new ConcurrentHashMap<>();
 
     public FlowDimensions() {
+    }
+
+    public FlowDimensions(String variant) {
+        setVariant(variant);
+    }
+
+    public FlowDimensions(String variant, String feature) {
+        setVariant(variant);
+        setFeature(feature);
+    }
+
+    public FlowDimensions(String variant, String feature, String experiment) {
+        setVariant(variant);
+        setFeature(feature);
+        setExperiment(experiment);
     }
 
     public FlowDimensions(Map<String, String> initial) {
@@ -53,6 +69,14 @@ public class FlowDimensions {
 
     public String getFeature() {
         return dimensions.get(FEATURE_KEY);
+    }
+
+    public FlowDimensions setExperiment(String experiment) {
+        return setDimension(EXPERIMENT_KEY, experiment);
+    }
+
+    public String getExperiment() {
+        return dimensions.get(EXPERIMENT_KEY);
     }
 
     public boolean isEmpty() {

@@ -146,3 +146,51 @@ sequenceDiagram
 
 * **`FlowExecution` & `StepExecution`**: Estruturados com coleções concorrentes (`ConcurrentLinkedQueue`), garantindo que dezenas de threads paralelas registrem etapas simultaneamente sem concorrência bloqueante ou *ConcurrentModificationException*.
 * **`ObservabilityTaskDecorator`**: Implementa `org.springframework.core.task.TaskDecorator`, encapsulando tarefas via `ContextSnapshotFactory` e sincronizando cópia profunda do mapa MDC com restauração garantida em `finally`.
+
+---
+
+## 6. Arquitetura Hexagonal com Engine SPI e Datadog Oficial Corporativo
+
+Para atender à diretriz corporativa de padronização do **Datadog** em ambientes produtivos sem gerar **Vendor Lock-in** e mantendo total autonomia de desenvolvimento local com ferramentas de código aberto (Prometheus, Jaeger, Grafana, Loki), o starter adota uma **Arquitetura Hexagonal (Ports and Adapters)**:
+
+```mermaid
+flowchart TD
+    subgraph CoreDomain ["Core Domain & Anotações de Negócio"]
+        FlowAnns["@TrackFlow, @TrackStep, @ObservationTag, @LogLeg"]
+        FlowContext["FlowContext & FlowDimensions"]
+        SPIPort["Port SPI: ObservabilityEngine"]
+        FlowAnns --> FlowContext
+        FlowContext --> SPIPort
+    end
+
+    subgraph Adapters ["Adaptadores Plugáveis"]
+        DDEngine["DatadogObservabilityEngine (Oficial Corporativo)"]
+        MicrEngine["MicrometerObservabilityEngine (Referência / Local Dev)"]
+        SPIPort -.-> DDEngine
+        SPIPort -.-> MicrEngine
+    end
+
+    subgraph TelemetryBackends ["Backends de Telemetria"]
+        DDEngine -->|"Datadog APM & Request Flow Maps"| DDCloud["Datadog Cloud / dd-java-agent"]
+        MicrEngine -->|"OTLP HTTP :4318 / Actuator Scrape"| LocalStack["Prometheus / Jaeger / Loki"]
+    end
+```
+
+### Contrato da SPI (`ObservabilityEngine`)
+Localizada em `com.empresa.platform.observability.core.engine`:
+- `EngineCapabilities getCapabilities()`: Descoberta de recursos em tempo de execução (Service Map, Request Flow Map, DSM, in-JVM lag polling).
+- `FlowScope startFlow(...)` e `void completeFlow(...)`: Gerenciamento do ciclo de vida e dimensões do fluxo.
+- `StepScope startStep(...)` e `void completeStep(...)`: Medição e marcação de subprocessos.
+- `void recordFlowInterruption(...)` e `void recordStepInterruption(...)`: Marcação precisa de falhas e causadores.
+- `void tagAttribute(key, value)`: Enriquecimento contextual seguro.
+
+### Capacidades dos Adaptadores
+| Recurso | `DatadogObservabilityEngine` | `MicrometerObservabilityEngine` |
+| :--- | :--- | :--- |
+| **Padrão de Ativação** | Produção corporativa (`observability.engine=datadog`) | Local, CI e Testes (`observability.engine=micrometer`) |
+| **Tags de Spans** | `flow.name`, `flow.variant`, `flow.step`, `flow.status`, `feature.name` | `flow`, `step`, `variant`, `feature` |
+| **Request Flow Map** | Suportado nativamente no Trace Explorer | Via queries PromQL no Grafana |
+| **Data Streams (DSM)** | Ativo via Datadog Agent (`requiresInJvmLagPolling() == false`) | Requer Binders in-JVM (`requiresInJvmLagPolling() == true`) |
+| **Ponte de Rastreio** | OpenTelemetry API Bridge (`DD_TRACE_OTEL_ENABLED=true`) | Micrometer Observation API |
+| **Zero Vendor Jars** | Sim (opera via padrões abertos e JVM agent) | Sim (open-source standard) |
+

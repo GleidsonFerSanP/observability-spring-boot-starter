@@ -95,6 +95,22 @@ Durante o ciclo de vida de uma perna de integração externa auditada por `@LogL
 | `leg_duration_ms` | `142` | Tempo decorrido em milissegundos da chamada externa. |
 | `leg_status` | `SUCCESS`, `FAILED` | Resultado da operação. |
 
+### 3.3. Convenção de Tags de Spans por Engine (Datadog APM vs Micrometer)
+
+A tabela abaixo compara os atributos de spans injetados conforme o adaptador ativo da `ObservabilityEngine`:
+
+| Conceito de Telemetria | `DatadogObservabilityEngine` (Produção) | `MicrometerObservabilityEngine` (Local / CI) | Finalidade no Observabilidade |
+| :--- | :--- | :--- | :--- |
+| Nome do Fluxo | `flow.name` e `flow` | `flow` | Identificador raiz do `@TrackFlow` no Datadog Request Flow Map e Prometheus. |
+| Variante de Rota | `flow.variant` e `variant` | `variant` | Segregação de migrações operacionais e canaries (`legacy` vs `new`). |
+| Nome do Subprocesso | `flow.step` e `step` | `step` | Nó filho do `@TrackStep` na árvore de execução. |
+| Tipo de Integração | `step.type` | `step.type` | Categoria arquitetural (`INTEGRATION_HTTP`, `DATABASE`, `CACHE`, etc.). |
+| Status de Conclusão | `flow.status` | `flow.status` | Estado final (`SUCCESS`, `DEGRADED_FALLBACK`, `INTERRUPTED`). |
+| Feature Flag Nome | `feature.name` | `feature` | Nome da feature flag que conduziu a rota. |
+| Feature Flag Variante | `feature.variant` | `variant` | Variante avaliada da feature flag. |
+| Tipo de Exceção | `error.type` | `error.class` | Classe de erro capturada em falhas. |
+| Mensagem de Erro | `error.message` | `error.message` | Mensagem detalhada da falha. |
+
 ---
 
 ## 4. Esquema de Logs Estruturados
