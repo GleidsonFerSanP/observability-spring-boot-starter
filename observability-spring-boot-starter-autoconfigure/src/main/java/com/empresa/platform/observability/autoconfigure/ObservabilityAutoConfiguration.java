@@ -7,16 +7,17 @@ import com.empresa.platform.observability.autoconfigure.aspect.LegLoggingAspect;
 import com.empresa.platform.observability.autoconfigure.aspect.SpelObservationAspect;
 import com.empresa.platform.observability.core.alerting.AlertDispatcher;
 import com.empresa.platform.observability.core.alerting.AlertNotifier;
+import com.empresa.platform.observability.core.alerting.AlertingProperties;
 import com.empresa.platform.observability.core.leg.SpelMaskingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +31,14 @@ public class ObservabilityAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConfigurationProperties(prefix = "app.observability.alerting")
+    public AlertingProperties alertingProperties(ObservabilityProperties properties) {
+        AlertingProperties ap = properties.getAlerting();
+        return ap != null ? ap : new AlertingProperties();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public SpelMaskingService spelMaskingService(@Autowired(required = false) ObjectMapper objectMapper) {
         return new SpelMaskingService(objectMapper != null ? objectMapper : new ObjectMapper());
     }
@@ -37,11 +46,11 @@ public class ObservabilityAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public AlertDispatcher alertDispatcher(
-            ObservabilityProperties properties,
+            AlertingProperties alertingProperties,
             @Autowired(required = false) List<AlertNotifier> notifiers,
             @Autowired(required = false) MeterRegistry meterRegistry
     ) {
-        return new AlertDispatcher(properties.getAlerting(), notifiers, meterRegistry);
+        return new AlertDispatcher(alertingProperties, notifiers, meterRegistry);
     }
 
     @Bean
@@ -54,10 +63,10 @@ public class ObservabilityAutoConfiguration {
     @ConditionalOnMissingBean(name = "webhookAlertNotifier")
     @ConditionalOnProperty(prefix = "observability.alerting", name = "webhook-url")
     public WebhookAlertNotifier webhookAlertNotifier(
-            ObservabilityProperties properties,
+            AlertingProperties alertingProperties,
             @Autowired(required = false) RestTemplateBuilder builder
     ) {
-        return new WebhookAlertNotifier(properties.getAlerting(), builder);
+        return new WebhookAlertNotifier(alertingProperties, builder);
     }
 
     @Bean
@@ -66,13 +75,13 @@ public class ObservabilityAutoConfiguration {
             @Autowired(required = false) MeterRegistry meterRegistry,
             @Autowired(required = false) ObservationRegistry observationRegistry,
             @Autowired(required = false) AlertDispatcher alertDispatcher,
-            ObservabilityProperties properties
+            AlertingProperties alertingProperties
     ) {
         return new FlowTrackingAspect(
                 meterRegistry,
                 observationRegistry != null ? observationRegistry : ObservationRegistry.NOOP,
                 alertDispatcher,
-                properties.getAlerting()
+                alertingProperties
         );
     }
 
