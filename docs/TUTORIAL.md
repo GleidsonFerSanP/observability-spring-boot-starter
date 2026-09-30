@@ -266,7 +266,7 @@ Um mecanismo de auditoria forense estruturada para registrar saltos de rede e in
 | Atributo | Tipo | Padrão | Descrição |
 |---|---|---|---|
 | `target` | `String` | `""` | Identificador do componente ou serviço alvo da perna (ex: `"customer-service"`, `"cielo-api"`). |
-| `type` | `LegType` | `LegType.OUTBOUND` | Direção arquitetural da integração: `INBOUND`, `OUTBOUND` ou `INTERNAL`. |
+| `type` | `LegType` | `LegType.OUTBOUND` | Direção arquitetural e natureza da perna: `INBOUND`, `OUTBOUND`, `CONFIG`, `DATABASE`, `MESSAGING`, `CACHE` ou `INTERNAL`. |
 | `includePayload` | `boolean` | `false` | Se `true`, serializa e audita os payloads (com máscaras aplicadas). Padrão `false` (opt-in estrito LGPD/PCI). |
 | `mask` | `MaskField[]` | `{}` | Regras de mascaramento dinâmico de dados sensíveis via SpEL. |
 
@@ -319,6 +319,45 @@ public class CustomerRegistrationController {
     )
     public CustomerResponse register(@RequestBody CustomerRegistrationRequest request) {
         return customerService.register(request);
+    }
+}
+```
+
+##### Exemplo de Carga de Configurações Dinâmicas ou Feature Flags (`LegType.CONFIG`):
+```java
+@Service
+public class FeatureFlagService {
+
+    private final UnleashClient unleashClient;
+
+    @LogLeg(
+        target = "unleash-feature-flags",
+        type = LegType.CONFIG,
+        includePayload = true
+    )
+    public FeatureToggleResponse checkFeature(String featureName, String userId) {
+        boolean enabled = unleashClient.isEnabled(featureName, userId);
+        return new FeatureToggleResponse(featureName, enabled);
+    }
+}
+```
+
+##### Exemplo de Carga de Segredos no HashiCorp Vault (`LegType.CONFIG`):
+```java
+@Component
+public class VaultSecretsLoader {
+
+    @LogLeg(
+        target = "hashicorp-vault",
+        type = LegType.CONFIG,
+        includePayload = true,
+        mask = {
+            @MaskField(expression = "token", pattern = MaskPattern.PASSWORD),
+            @MaskField(expression = "apiKey", pattern = MaskPattern.FULL_MASK)
+        }
+    )
+    public VaultSecret loadSecret(String secretPath) {
+        return vaultTemplate.read(secretPath, VaultSecret.class).getData();
     }
 }
 ```

@@ -134,9 +134,14 @@ public UserResponse register(@RequestBody UserRequest request) {
 ```
 
 ### Enums de Suporte a Pernas de Auditoria:
-* **`LegType`**: Define o sentido arquitetural da perna auditada:
-  - `INBOUND`: Requisições recebidas pela aplicação (controladores HTTP, ouvintes de fila).
-  - `OUTBOUND`: Chamadas enviadas para fora da aplicação (clientes HTTP/Feign, publicadores).
+* **`LegType`**: Define o sentido arquitetural e natureza da perna auditada:
+  - `INBOUND`: Requisições recebidas pela aplicação (controladores HTTP/REST, endpoints gRPC).
+  - `OUTBOUND`: Chamadas síncronas enviadas para microsserviços ou terceiros (clientes HTTP/Feign, WebClient).
+  - `CONFIG`: Carregamento e resolução de configurações internas/remotas, segredos e Feature Flags (Vault, Consul, Spring Cloud Config, Unleash).
+  - `DATABASE`: Operações de persistência e consultas a bancos relacionais e NoSQL (JPA, JDBC, MongoDB, DynamoDB).
+  - `MESSAGING`: Operações de publicação e consumo assíncrono em brokers de mensageria (Kafka, RabbitMQ, SQS).
+  - `CACHE`: Leituras, gravações e invalidações em camadas de cache (Redis, Memcached, Caffeine).
+  - `INTERNAL`: Computação, transformações pesadas ou processamentos internos críticos em memória.
 * **`LegPhase`**: Fases do ciclo de vida registradas estruturadamente:
   - `START` / `REQUEST`: Início da execução e dados de entrada.
   - `END` / `RESPONSE`: Conclusão com sucesso e dados de retorno.

@@ -92,7 +92,7 @@ Durante o ciclo de vida de uma perna de integração externa auditada por `@LogL
 |---|---|---|
 | `leg_number` | `1`, `2` | Número sequencial da perna de integração dentro da thread atual. |
 | `leg_parent` | `1` | Número da perna pai (em caso de chamadas encadeadas). |
-| `leg_type` | `INBOUND`, `OUTBOUND` | Direção arquitetural da integração baseada no enum `LegType`. |
+| `leg_type` | `INBOUND`, `OUTBOUND`, `CONFIG`, `DATABASE`, `MESSAGING`, `CACHE`, `INTERNAL` | Direção arquitetural e natureza da integração baseada no enum `LegType`. |
 | `leg_target` | `CustomerFeignClient` | Destino lógico ou físico invocado. |
 | `leg_phase` | `REQUEST`, `RESPONSE`, `ERROR` | Fase do ciclo de vida da chamada baseada no enum `LegPhase`. |
 | `leg_duration_ms` | `142` | Tempo decorrido em milissegundos da chamada externa. |
