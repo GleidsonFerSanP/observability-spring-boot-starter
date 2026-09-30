@@ -2,6 +2,7 @@ package com.empresa.platform.observability.autoconfigure;
 
 import com.empresa.platform.observability.autoconfigure.aspect.FlowTrackingAspect;
 import com.empresa.platform.observability.autoconfigure.aspect.LegLoggingAspect;
+import com.empresa.platform.observability.autoconfigure.aspect.MdcAspect;
 import com.empresa.platform.observability.autoconfigure.aspect.SpelObservationAspect;
 import com.empresa.platform.observability.autoconfigure.async.ObservabilityTaskDecorator;
 import com.empresa.platform.observability.core.alerting.AlertDispatcher;
@@ -45,6 +46,7 @@ class ObservabilityAutoConfigurationTest {
             assertThat(context).hasSingleBean(FlowTrackingAspect.class);
             assertThat(context).hasSingleBean(LegLoggingAspect.class);
             assertThat(context).hasSingleBean(SpelObservationAspect.class);
+            assertThat(context).hasSingleBean(MdcAspect.class);
             assertThat(context).hasSingleBean(ObservabilityTaskDecorator.class);
             assertThat(context).hasSingleBean(CorrelationIdFilter.class);
             assertThat(context).hasSingleBean(AlertDispatcher.class);
@@ -60,6 +62,7 @@ class ObservabilityAutoConfigurationTest {
                     assertThat(context).doesNotHaveBean(FlowTrackingAspect.class);
                     assertThat(context).doesNotHaveBean(LegLoggingAspect.class);
                     assertThat(context).doesNotHaveBean(SpelObservationAspect.class);
+                    assertThat(context).doesNotHaveBean(MdcAspect.class);
                     assertThat(context).doesNotHaveBean(ObservabilityTaskDecorator.class);
                     assertThat(context).doesNotHaveBean(CorrelationIdFilter.class);
                     assertThat(context).doesNotHaveBean(AlertDispatcher.class);

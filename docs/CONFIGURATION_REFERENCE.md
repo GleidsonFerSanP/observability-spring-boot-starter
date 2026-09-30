@@ -28,6 +28,7 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 | `observability.flow.enabled` / `observability.flow-tracking.enabled` | `boolean` | `true` | Ativa/desativa o aspecto `@TrackFlow` e a instrumentação de decomposição de latência do `FlowTrackingAspect`. |
 | `observability.correlation.enabled` | `boolean` | `true` | Ativa/desativa o filtro de Correlation ID para servlets (`CorrelationIdFilter`). |
 | `observability.leg-logging.enabled` | `boolean` | `true` | Ativa/desativa a auditoria estruturada forense de pernas (`AUDIT_LEG_LOGGER`) e o aspecto `@LogLeg`. |
+| `observability.mdc.enabled` | `boolean` | `true` | Ativa/desativa o aspecto `@MDC` para enriquecimento declarativo de contexto de logs via `MdcAspect`. |
 | `observability.spel-observation.enabled` | `boolean` | `true` | Ativa/desativa a extração dinâmica de tags via SpEL através do aspecto `SpelObservationAspect`. |
 | `observability.feign.enabled` | `boolean` | `true` | Ativa/desativa a injeção automática de headers W3C TraceContext e `X-Correlation-Id` em clientes Feign. |
 | `observability.resilience.enabled` | `boolean` | `true` | Ativa/desativa o listener de transição de estado de Circuit Breakers Resilience4j. |
@@ -150,3 +151,33 @@ class MinhaRegraDeNegocioTest {
     // A aplicação sobe sem nenhum aspecto ou overhead de observabilidade
 }
 ```
+
+---
+
+## 6. Configurações Centralizadas de Logging (Logback / `logback.yml`)
+
+O starter injeta automaticamente propriedades padrão de logging através do `ObservabilityLoggingEnvironmentPostProcessor`, lidas de `logback.yml` com prioridade padrão (*lowest precedence*), permitindo customização trivial no `application.yml` dos microsserviços:
+
+| Propriedade | Padrão | Descrição |
+|---|---|---|
+| `logging.pattern.console` | `%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} ...` | Padrão ANSI colorido com timestamp, thread, nível, logger, `cid`, `traceId`, `spanId`, `flow` e `step`. |
+| `logging.pattern.level` | `%5p [cid=%X{correlation_id:-none}]` | Injeta o Correlation ID canônico no prefixo do nível de log. |
+| `logging.level.com.empresa.platform.observability` | `INFO` | Nível de log dos interceptores, aspectos e engines do starter. |
+| `logging.level.AUDIT_LEG_LOGGER` | `INFO` | Nível do logger estruturado forense de pernas (`@LogLeg`). |
+| `logging.level.org.springframework.web` | `INFO` | Nível de log para requisições web do framework. |
+
+### Inclusão no `logback-spring.xml` da Aplicação
+
+Para aplicações que utilizam arquivo XML de logback:
+
+```xml
+<configuration>
+    <!-- Importa appenders padronizados e convenções semânticas corporativas -->
+    <include resource="com/empresa/platform/observability/logback/observability-logback-defaults.xml"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
+```
+

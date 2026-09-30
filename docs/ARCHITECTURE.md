@@ -8,7 +8,7 @@ Este documento detalha o desenho técnico, os padrões de engenharia de software
 
 1. **80-95% Automático / 5-20% Declarativo**:
    - Toda a infraestrutura técnica (HTTP, RestClient, Feign, JDBC, HikariCP, Kafka, SQS, Resilience4j, JVM, Logs Estruturados, Context Propagation) é descoberta e instrumentada automaticamente.
-   - Anotações são reservadas estritamente para enriquecimento semântico de negócio onde o framework não possui capacidade de inferência (`@TrackFlow`, `@TrackStep`, `@LogLeg`, `@ObservationTag`).
+   - Anotações são reservadas estritamente para enriquecimento semântico de negócio onde o framework não possui capacidade de inferência (`@TrackFlow`, `@TrackStep`, `@LogLeg`, `@MDC`, `@ObservationTag`).
 2. **Desacoplamento e Não-Intrusividade**:
    - Nenhuma classe de negócio manipula `MeterRegistry`, `Tracer`, `Span` ou `MDC` diretamente.
    - Desligar o starter (`observability.enabled=false`) remove 100% dos aspectos e filtros sem alterar o comportamento funcional das aplicações.
@@ -29,7 +29,7 @@ observability-spring-boot-starter-project/
 ├── pom.xml                                          # Parent POM (BOM & gerência unificada de dependências)
 │
 ├── observability-api/                               # MÓDULO API (Zero dependências externas, pure Java)
-│   ├── annotation/                                  # Anotações de domínio: @TrackFlow, @TrackStep, @FlowDimension, @LogLeg, @ObservationTag
+│   ├── annotation/                                  # Anotações de domínio: @TrackFlow, @TrackStep, @FlowDimension, @LogLeg, @MDC, @ObservationTag
 │   └── dimension/                                   # Contratos de dimensão: FlowDimensions
 │
 ├── observability-core/                              # MÓDULO CORE (POJO / Framework-agnostic)
@@ -180,7 +180,7 @@ Para atender à diretriz corporativa de padronização do **Datadog** em ambient
 ```mermaid
 flowchart TD
     subgraph CoreDomain ["Core Domain & Anotações de Negócio"]
-        FlowAnns["@TrackFlow, @TrackStep, @ObservationTag, @LogLeg"]
+        FlowAnns["@TrackFlow, @TrackStep, @LogLeg, @MDC, @ObservationTag"]
         FlowContext["FlowContext & FlowDimensions"]
         SPIPort["Port SPI: ObservabilityEngine"]
         FlowAnns --> FlowContext
@@ -254,10 +254,11 @@ flowchart LR
     Attr["Atributo / Tag de Negócio"] --> Check{Alta Cardinalidade? (IDs, Tokens, Mensagens)}
     Check -- Não (Baixa: status, variant, feature) --> Metrics["MeterRegistry (Prometheus / Datadog Metrics)"]
     Check -- Sim (Alta: userId, orderId) --> Spans["Span Attributes (OTel / Datadog Trace Explorer)"]
-    Check -- Sim --> Logs["MDC / Structured Logs (Grafana Loki)"]
+    Check -- Sim --> Logs["MDC / Structured Logs (@MDC)"]
 ```
 
 1. **Baixa Cardinalidade (Métricas / TSDB)**: Apenas dimensões finitas e previsíveis (`flow.name`, `flow.variant`, `step.name`, `status`, `feature.name`).
-2. **Alta Cardinalidade (Tracing & Logs)**: Expressões SpEL avaliadas dinamicamente via `@ObservationTag(highCardinality = true)` são roteadas exclusivamente para os atributos de Span e campos de log estruturado, permitindo consultas forenses exatas sem degradar o TSDB.
+2. **Alta Cardinalidade (Tracing & Spans)**: Expressões SpEL avaliadas dinamicamente via `@ObservationTag(highCardinality = true)` são roteadas exclusivamente para os atributos de Span no OpenTelemetry / Datadog APM, permitindo investigações pontuais sem degradar o TSDB.
+3. **Contexto de Logs (SLF4J MDC)**: Atributos dinâmicos necessários para depuração forense em logs são injetados exclusivamente via `@MDC`, garantindo visibilidade em ferramentas como Loki ou Datadog Logs sem onerar nem métricas nem traces.
 
 

@@ -151,36 +151,135 @@ public UserResponse register(@RequestBody UserRequest request) {
 
 ---
 
-## 4. Enriquecimento Dinâmico de Tags e MDC com SpEL (`@ObservationTag` e `@FlowDimension`)
+## 4. Enriquecimento de Contexto: Logs (@MDC) vs Métricas e Traces (@ObservationTag)
 
-Elimina **100% dos `MDC.put(...)` manuais** do código de negócio. Permite extrair atributos de parâmetros de métodos e objetos de retorno usando Spring Expression Language (SpEL) ou ligação direta de parâmetros:
+Para assegurar uma separação arquitetural cristalina de responsabilidades, o starter divide a telemetria em três pilares complementares, cada um com sua anotação dedicada:
+
+| Anotação | Finalidade | Destino / Efeito | Ciclo de Vida |
+|---|---|---|---|
+| **[`@MDC`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/MDC.java)** | **Contexto de Logging (SLF4J MDC)** | Injeta variáveis nos logs estruturados e console. Elimina 100% dos `MDC.put` e `MDC.remove` do código de negócio. | Empilhado (*stack semantics*) no início do método e removido/restaurado em `finally`. |
+| **[`@ObservationTag`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ObservationTag.java)** | **Métricas e Tracing Spans (Micrometer)** | Injeta tags na `Observation` ativa (`lowCardinality` em timers Prometheus/Datadog; `highCardinality` em spans OpenTelemetry/Datadog APM). | Associado ao ciclo de vida da `Observation` do Micrometer. |
+| **[`@FlowDimension`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/FlowDimension.java)** | **Dimensão de Negócio do Fluxo** | Dimensões macro anexadas ao `@TrackFlow`, propagadas automaticamente para métricas de fluxo e MDC. | Durante todo o escopo do `@TrackFlow`. |
+
+---
+
+### 4.1 `@MDC`: Eliminando 100% dos `MDC.put(...)` Manuais
+
+A anotação `@MDC` foi criada especificamente para que as classes de serviço, controladores e adaptadores nunca precisem importar `org.slf4j.MDC`. Ela pode ser aplicada tanto em **nível de método** (com SpEL ou valores estáticos) quanto em **nível de parâmetro**:
+
+```java
+// 1. Extração direta de parâmetro
+public void processOrder(@MDC("orderId") String orderId, @MDC("tenantId") String tenant) {
+    log.info("Processando pedido"); // 'orderId' e 'tenantId' já presentes nos logs!
+}
+
+// 2. Extração dinâmica via SpEL a partir de objetos complexos
+@MDC(key = "userId", expression = "#request.customer.id")
+@MDC(key = "plan", expression = "#request.subscription.planType")
+public void subscribe(SubscriptionRequest request) {
+    log.info("Registrando assinatura"); // 'userId' e 'plan' presentes nos logs!
+}
+
+// 3. Valor estático declarado
+@MDC(key = "layer", value = "entrypoint")
+public void handle() {
+    log.info("Requisição recebida");
+}
+```
+
+#### Ciclo de Vida e Isolamento Seguro no MDC (Stack Semantics)
+* **Preservação de Contexto e Escopos Aninhados**: Se o método `A` define `@MDC("tenant", "empresa-1")` e chama o método `B` que define `@MDC("tenant", "empresa-2")`, o `MdcAspect` armazena o valor anterior em uma pilha in-JVM na thread. Ao término de `B`, o valor `"empresa-1"` é restaurado com precisão cirúrgica.
+* **Limpeza Garantida em `finally`**: Mesmo se o método lançar uma exceção de negócio ou erro de infraestrutura, o bloco `finally` do aspecto garante a restauração dos valores ou o `MDC.remove()`.
+* **Zero Leakage em Thread Pools**: Garante que threads reutilizadas (`Tomcat Workers`, `@Async`, pools de mensageria) não retenham chaves residuais de requisições anteriores.
+
+---
+
+### 4.2 `@ObservationTag`: Tags em Métricas e Spans de Tracing
+
+Dedicada estritamente ao Micrometer `Observation`:
 
 ```java
 @Observed(name = "order.payment")
-@TrackStep(name = "process-payment", type = ComponentType.BUSINESS)
-@ObservationTag(key = "tenant_id", expression = "#tenantId", highCardinality = false)
-@ObservationTag(key = "order_id", expression = "#orderId", highCardinality = true)
-@ObservationTag(key = "status", expression = "#result?.status()", highCardinality = false)
-public PaymentResult executePayment(String tenantId, 
-                                    String orderId, 
-                                    @ObservationTag(key = "customer_cpf") String cpf,
-                                    PaymentDetails details) {
-    // 💡 ZERO linhas de MDC.put("order_id", ...) ou MDC.remove(...)!
-    // As variáveis 'flow', 'step', 'step.type', 'tenant_id', 'order_id' e 'customer_cpf'
-    // já estão ativas no MDC do SLF4J para todos os logs executados dentro deste escopo.
-    log.info("Processando pagamento da transação");
+@ObservationTag(key = "payment_method", expression = "#details.method", highCardinality = false)
+@ObservationTag(key = "transaction_id", expression = "#details.transactionId", highCardinality = true)
+public PaymentResult executePayment(PaymentDetails details) {
     return paymentProcessor.pay(details);
 }
 ```
 
-### Ciclo de Vida e Isolamento Seguro no MDC (Stack Semantics)
-* **Injeção Pré-Execução**: Parâmetros e expressões SpEL (sem `#result`) são avaliados antes do método e inseridos imediatamente no MDC do SLF4J (`tag.mdc() == true` por padrão).
-* **Limpeza Garantida em `finally`**: Ao término da execução (mesmo em caso de `RuntimeException` ou erro de infraestrutura), o `SpelObservationAspect` e o `FlowTrackingAspect` restauram os valores anteriores do MDC ou executam `MDC.remove()`.
-* **Segurança Concorrente em Thread Pools**: Garante que pools de threads (`@Async`, `ExecutorService`, TomCat Workers) nunca sofram contaminação de contexto (*context leakage*) entre diferentes requisições.
-* **Escopos Aninhados**: Se um método interno sobrescrever temporariamente uma chave (ex: `tenant`), o escopo anterior é preservado e restaurado automaticamente assim que o método interno encerra.
+* **`highCardinality = false`**: Roteado para `lowCardinalityKeyValue`, convertendo-se em tags dimensionais para séries temporais (Prometheus / Datadog Metrics).
+* **`highCardinality = true`**: Roteado para `highCardinalityKeyValue`, sendo anexado estritamente aos atributos do Span OpenTelemetry / Datadog APM, prevenindo explosão de cardinalidade e vazamento de memória no TSDB.
 
-### Proteção Contra Explosão de Cardinalidade
-O starter inspeciona as chaves de tags dinâmicas. Chaves identificadas como potencialmente perigosas para séries temporais (`user_id`, `cpf`, `email`, `document`, `order_id`, `account_id`, etc.) são **automaticamente promovidas para tags de alta cardinalidade** (`getHighCardinalityKeyValues()`), sendo visíveis em traces e spans do OpenTelemetry e logs estruturados no MDC, mas protegendo o TSDB (Prometheus/Datadog) contra esgotamento de memória.
+---
+
+### 4.3 Arquitetura Canônica de um Fluxo de Negócio Completo
+
+Veja como um fluxo real é instrumentado do Controller HTTP às integrações externas, combinando as anotações sem nenhuma linha manual de telemetria ou logging boiler-plate:
+
+```java
+// ==============================================================================
+// 1. ENTRYPOINT: Controller REST
+// ==============================================================================
+@RestController
+@RequestMapping("/api/v1/orders")
+public class OrderController {
+
+    private final OrderService orderService;
+
+    @PostMapping
+    @TrackFlow("order-checkout")
+    @LogLeg(target = "order-ingress", type = LegType.INBOUND, includePayload = true,
+            mask = { @MaskField(expression = "#request.cardNumber", pattern = MaskPattern.CARD_PARTIAL) })
+    @MDC(key = "tenant_id", expression = "#request.tenantId")
+    public ResponseEntity<OrderResponse> createOrder(@RequestBody OrderRequest request) {
+        log.info("Iniciando checkout de pedido"); 
+        // MDC contém: correlation_id, traceId, spanId, flow="order-checkout", tenant_id="acme"
+        return ResponseEntity.ok(orderService.checkout(request));
+    }
+}
+
+// ==============================================================================
+// 2. DOMAIN ORCHESTRATION: Serviço de Negócio
+// ==============================================================================
+@Service
+public class OrderService {
+
+    private final InventoryClient inventoryClient;
+    private final PaymentClient paymentClient;
+    private final OrderRepository orderRepository;
+
+    @TrackStep(name = "order-checkout-orchestration", type = ComponentType.BUSINESS)
+    @MDC(key = "order_id", expression = "#request.orderId")
+    public OrderResponse checkout(OrderRequest request) {
+        log.info("Validando estoque");
+        inventoryClient.reserveStock(request.orderId(), request.items());
+
+        log.info("Processando pagamento");
+        PaymentReceipt receipt = paymentClient.charge(request.orderId(), request.totalAmount());
+
+        log.info("Persistindo pedido confirmado");
+        return orderRepository.save(new Order(request, receipt));
+    }
+}
+
+// ==============================================================================
+// 3. EXTERNAL INTEGRATION: Cliente Feign / REST
+// ==============================================================================
+@Component
+public class PaymentClient {
+
+    private final PaymentFeignClient feignClient;
+
+    @TrackStep(name = "payment-gateway-charge", type = ComponentType.FEIGN)
+    @LogLeg(target = "payment-gateway", type = LegType.OUTBOUND)
+    public PaymentReceipt charge(@MDC("order_id") String orderId, BigDecimal amount) {
+        log.info("Enviando cobrança ao gateway externo"); 
+        // Automaticamente gera span child, perna de auditoria OUTBOUND com latência e status,
+        // e propaga X-Correlation-Id e W3C traceparent nos headers HTTP downstream.
+        return feignClient.authorize(new ChargeRequest(orderId, amount));
+    }
+}
+```
 
 ---
 
@@ -262,3 +361,44 @@ observability:
    - Com o `dd-java-agent` ativo com `-Ddd.data.streams.enabled=true`, o Datadog monitora a latência de ponta a ponta (pathway latency) e o lag de mensageria diretamente nos brokers e filas, eliminando consultas repetitivas de polling in-JVM via `AdminClient` ou `GetQueueAttributes`.
 3. **Ponte Não-Intrusiva OpenTelemetry**:
    - Injeta atributos de span via `OtelSpanBridge` capturados automaticamente pelo Datadog Java Agent via `DD_TRACE_OTEL_ENABLED=true`, sem exigir nenhum jar fechado ou proprietário no classpath da aplicação.
+
+---
+
+## 8. Configuração Centralizada de Logging (Logback & `logback.yml`)
+
+O starter fornece uma configuração corporativa padronizada para o Logback, eliminando a necessidade de duplicar arquivos complexos de formatação de log em cada microsserviço.
+
+### 8.1 Carregamento Automático via `logback.yml`
+
+Através do [`ObservabilityLoggingEnvironmentPostProcessor`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/java/com/empresa/platform/observability/autoconfigure/logging/ObservabilityLoggingEnvironmentPostProcessor.java), o starter injeta na inicialização do Spring Boot as propriedades padrão de logging definidas em `logback.yml` com prioridade padrão (*lowest precedence*). Isso significa que qualquer microsserviço pode sobrescrever qualquer propriedade em seu próprio `application.yml`:
+
+* **Padrão de Console Colorido (Dev/Local)**:
+  Exibe timestamp, thread, nível, logger, e os identificadores canônicos de observabilidade:
+  ```text
+  %clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%15.15t]){faint} %clr(%-5p) %clr(%-40.40logger{39}){cyan} %clr([cid=%X{correlation_id:-none}]){magenta} %clr([%X{traceId:-},%X{spanId:-}]){faint} %clr([flow=%X{flow:-none},step=%X{step:-none}]){yellow} - %m%n%wEx
+  ```
+* **MDC Transversal**:
+  Todas as chaves adicionadas via `@MDC`, `@TrackFlow` (`flow`), `@TrackStep` (`step`, `step.type`) e `@LogLeg` (`leg_*`) aparecem automaticamente.
+
+### 8.2 Inclusão de Defaults XML no Projeto (`observability-logback-defaults.xml`)
+
+Caso a aplicação utilize um `logback-spring.xml` próprio (por exemplo, para configurar appenders customizados para Loki, Splunk ou Datadog Agent), basta importar as definições canônicas do starter:
+
+```xml
+<configuration>
+    <!-- Importa appenders padronizados e convenções semânticas corporativas -->
+    <include resource="com/empresa/platform/observability/logback/observability-logback-defaults.xml"/>
+
+    <!-- Seus appenders específicos podem estender ou reutilizar os padrões -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
+```
+
+#### Comportamento Multi-Perfil do Logback:
+1. **Perfil Local / Desenvolvimento (`!container & !prod`)**:
+   Console ANSI colorido com `cid`, `traceId`, `spanId`, `flow` e `step` destacados para leitura ágil pelo desenvolvedor.
+2. **Perfil Container / Cloud / Produção (`container | prod`)**:
+   Console em JSON estruturado com todos os metadados do MDC indexados como chaves de primeiro nível (`correlation_id`, `trace_id`, `span_id`, `flow`, `step`, `step_type`, `leg_*`), pronto para ingestão nativa por Datadog Logs, Loki, Elasticsearch ou CloudWatch.
+

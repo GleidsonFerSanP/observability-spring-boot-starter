@@ -16,7 +16,7 @@ Starter corporativo padronizado para observabilidade unificada em ecossistemas S
 |---|---|
 | 🏛️ **[Arquitetura do Starter](docs/ARCHITECTURE.md)** | Princípios de design, estrutura multi-módulo (`core`, `autoconfigure`, `starter`), auto-discovery condicional, diagramas de sequência de propagação de contexto assíncrono e formulação matemática da atribuição de latência. |
 | ⚙️ **[Referência de Configuração](docs/CONFIGURATION_REFERENCE.md)** | Catálogo completo de propriedades `observability.*`, chaves mestras e granulares (`observability.<feature>.enabled`), parametrização de SLAs, limiares de alarmística e exemplo de `application.yml`. |
-| 💡 **[Guia de Capacidades e Uso Prático](docs/CAPABILITIES_GUIDE.md)** | Guia de uso das anotações `@TrackFlow`, `@TrackStep`, `@LogLeg`, `@MaskField`, `@ObservationTag`, propagação de contexto assíncrono, barramento de eventos de alerta (`AlertDispatcher`) e segregação dimensional de feature flags. |
+| 💡 **[Guia de Capacidades e Uso Prático](docs/CAPABILITIES_GUIDE.md)** | Guia de uso das anotações `@TrackFlow`, `@TrackStep`, `@LogLeg`, `@MaskField`, `@MDC`, `@ObservationTag`, propagação de contexto assíncrono, barramento de eventos de alerta (`AlertDispatcher`) e segregação dimensional de feature flags. |
 | 📊 **[Esquema de Telemetria (Telemetry Schema)](docs/TELEMETRY_SCHEMA.md)** | Catálogo canônico de métricas dimensionais (`observability.flow.*`, `resilience4j.*`, `hikaricp.*`), chaves padronizadas de MDC (`correlation_id`, `traceId`, `variant`), esquemas de logs estruturados (`AUDIT_LEG_LOGGER`) e eventos de alerta. |
 
 ---
@@ -25,7 +25,7 @@ Starter corporativo padronizado para observabilidade unificada em ecossistemas S
 
 Nenhuma aplicação de microsserviço de negócio deve precisar implementar:
 - Instanciação de `MeterRegistry`, `Tracer`, `Timer.Sample` ou `ObservationRegistry`.
-- Manipulação manual de `Span`, abertura de escopos ou limpeza de `MDC`.
+- Manipulação manual de `Span`, abertura de escopos ou chamadas de `MDC.put` / `MDC.remove`.
 - Filtros manuais de extração e injeção de `X-Correlation-Id` ou W3C `traceparent`.
 - Binders customizados de monitoramento de filas, bancos de dados ou disjuntores.
 
@@ -37,7 +37,7 @@ Nenhuma aplicação de microsserviço de negócio deve precisar implementar:
 
 5-20% da observabilidade
           ↓
-   Semântica Declarativa (@TrackFlow, @TrackStep, @LogLeg, @ObservationTag)
+   Semântica Declarativa (@TrackFlow, @TrackStep, @LogLeg, @MDC, @ObservationTag)
 ```
 
 ---
@@ -107,7 +107,8 @@ observability:
 | **Subprocessos de Negócio** | Declarativa (`@TrackStep`) | Latência de esforço nominal vs atribuída no tempo de relógio, classificação arquitetural tipada via `ComponentType`. |
 | **Fluxos Semânticos** | Declarativa (`@TrackFlow`) | Delimitação de orquestrações de negócio ponta a ponta e governança de interrupções. |
 | **Auditoria Forense & LGPD** | Declarativa (`@LogLeg`) | Per-leg logging com mascaramento automático de dados sensíveis via SpEL (`@MaskField`). |
-| **Tags Dinâmicas** | Declarativa (`@ObservationTag`) | Extração dinâmica de dimensões semânticas a partir de argumentos e retornos com SpEL. |
+| **Contexto de Logs (MDC)** | Declarativa ([`@MDC`](docs/CAPABILITIES_GUIDE.md#41-mdc-eliminando-100-dos-mdcput-manuais)) | Injeção declarativa no SLF4J MDC via parâmetros ou SpEL, eliminando 100% dos `MDC.put` manuais. |
+| **Tags Dinâmicas (Métricas & Spans)** | Declarativa ([`@ObservationTag`](docs/CAPABILITIES_GUIDE.md#42-observationtag-tags-em-métricas-e-spans-de-tracing)) | Extração dinâmica de dimensões semânticas para o Micrometer Observation com separação de cardinalidade. |
 
 ---
 
