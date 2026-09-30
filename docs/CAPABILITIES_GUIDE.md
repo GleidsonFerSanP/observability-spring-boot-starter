@@ -203,19 +203,25 @@ public void handle() {
 
 ### 4.2 `@ObservationTag`: Tags em Métricas e Spans de Tracing
 
-Dedicada estritamente ao Micrometer `Observation`:
+Dedicada estritamente ao enriquecimento de `Observation` do Micrometer. Suporta tanto **valores literais fixos** (dispensando SpEL) quanto **expressões dinâmicas**:
 
 ```java
 @Observed(name = "order.payment")
-@ObservationTag(key = "payment_method", expression = "#details.method", highCardinality = false)
-@ObservationTag(key = "transaction_id", expression = "#details.transactionId", highCardinality = true)
-public PaymentResult executePayment(PaymentDetails details) {
+@ObservationTag(key = "messaging.system", value = "kafka")                                   // 1. Valor literal fixo
+@ObservationTag(key = "client.name", value = "cielo-gateway")                                // 2. Valor literal fixo
+@ObservationTag(key = "payment_method", expression = "#details.method", highCardinality = false) // 3. Dinâmico (Métrica)
+@ObservationTag(key = "transaction_id", expression = "#details.transactionId", highCardinality = true) // 4. Dinâmico (Span Tracing)
+public PaymentResult executePayment(PaymentDetails details, @ObservationTag(key = "region") String region) {
     return paymentProcessor.pay(details);
 }
 ```
 
-* **`highCardinality = false`**: Roteado para `lowCardinalityKeyValue`, convertendo-se em tags dimensionais para séries temporais (Prometheus / Datadog Metrics).
-* **`highCardinality = true`**: Roteado para `highCardinalityKeyValue`, sendo anexado estritamente aos atributos do Span OpenTelemetry / Datadog APM, prevenindo explosão de cardinalidade e vazamento de memória no TSDB.
+* **Valores Literais Fixos (`value = "..."`)**: Utilizados quando a dimensão é estática/constante para aquele método, classe ou componente (ex: nome de cliente, sistema de mensageria, tópico fixo, ambiente). Evita a necessidade de criar SpEL strings literais como `expression = "'kafka'"`.
+* **Expressões SpEL (`expression = "..."`)**: Utilizadas quando a dimensão deve ser extraída dos parâmetros de entrada (`#param`), variáveis de contexto ou do retorno do método (`#result`).
+* **Precedência**: Se `value` for informado (não vazio), ele tem precedência e é aplicado diretamente sem o overhead de parsing do SpEL.
+* **Escopo e Posicionamento**: Pode ser anotada em métodos, classes ou parâmetros individuais.
+* **`highCardinality = false` (Padrão: Baixa Cardinalidade)**: Roteado para `lowCardinalityKeyValue`, convertendo-se em tags dimensionais para séries temporais (Prometheus / Datadog Metrics).
+* **`highCardinality = true` (Alta Cardinalidade)**: Roteado para `highCardinalityKeyValue`, sendo anexado estritamente aos atributos do Span OpenTelemetry / Datadog APM, prevenindo explosão de cardinalidade e vazamento de memória no TSDB.
 
 ---
 

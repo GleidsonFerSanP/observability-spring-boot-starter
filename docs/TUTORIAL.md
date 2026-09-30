@@ -803,7 +803,7 @@ public class PaymentClient {
     @TrackStep(value = "charge-payment-gateway", type = ComponentType.FEIGN)
     @LogLeg(target = "payment-gateway", type = LegType.OUTBOUND)
     @CircuitBreaker(name = "payment-gateway", fallbackMethod = "chargeFallback")
-    @ObservationTag(key = "payment.provider", expression = "'cielo'", lowCardinality = true)
+    @ObservationTag(key = "payment.provider", value = "cielo", lowCardinality = true)
     public PaymentReceipt charge(@MDC("userId") String userId, Double amount) {
         return feignClient.authorize(new AuthorizationPayload(userId, amount));
     }
