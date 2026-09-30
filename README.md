@@ -14,6 +14,7 @@ Starter corporativo padronizado para observabilidade unificada em ecossistemas S
 
 | Documento | Descrição |
 |---|---|
+| 🎓 **[Tutorial Completo de Adoção](docs/TUTORIAL.md)** | Tutorial passo a passo cobrindo o como e o porquê de cada feature, com exemplos de código, o que é gerado na telemetria, boas práticas e construção de microsserviço de ponta a ponta. |
 | 🏛️ **[Arquitetura do Starter](docs/ARCHITECTURE.md)** | Princípios de design, estrutura multi-módulo (`core`, `autoconfigure`, `starter`), auto-discovery condicional, diagramas de sequência de propagação de contexto assíncrono e formulação matemática da atribuição de latência. |
 | ⚙️ **[Referência de Configuração](docs/CONFIGURATION_REFERENCE.md)** | Catálogo completo de propriedades `observability.*`, chaves mestras e granulares (`observability.<feature>.enabled`), parametrização de SLAs, limiares de alarmística e exemplo de `application.yml`. |
 | 💡 **[Guia de Capacidades e Uso Prático](docs/CAPABILITIES_GUIDE.md)** | Guia de uso das anotações `@TrackFlow`, `@TrackStep`, `@LogLeg`, `@MaskField`, `@MDC`, `@ObservationTag`, propagação de contexto assíncrono, barramento de eventos de alerta (`AlertDispatcher`) e segregação dimensional de feature flags. |

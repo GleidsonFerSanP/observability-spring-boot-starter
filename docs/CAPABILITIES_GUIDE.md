@@ -2,6 +2,8 @@
 
 Este documento descreve detalhadamente cada uma das capacidades do starter, explicando como utilizá-las na prática e demonstrando exemplos de código em estrita conformidade com a especificação técnica corporativa **Candidate Architecture v2**.
 
+> 💡 **Para um passo a passo completo de como e por que usar cada funcionalidade em um microsserviço real, consulte o [Tutorial Completo de Adoção](TUTORIAL.md).**
+
 ---
 
 ## 1. Inteligência de Fluxo (`@TrackFlow`)
