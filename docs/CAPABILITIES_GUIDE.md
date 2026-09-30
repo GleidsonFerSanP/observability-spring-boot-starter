@@ -151,22 +151,36 @@ public UserResponse register(@RequestBody UserRequest request) {
 
 ---
 
-## 4. Enriquecimento Dinâmico de Tags com SpEL (`@ObservationTag`)
+## 4. Enriquecimento Dinâmico de Tags e MDC com SpEL (`@ObservationTag` e `@FlowDimension`)
 
-Permite enriquecer observações e traces em tempo de execução usando Spring Expression Language (SpEL):
+Elimina **100% dos `MDC.put(...)` manuais** do código de negócio. Permite extrair atributos de parâmetros de métodos e objetos de retorno usando Spring Expression Language (SpEL) ou ligação direta de parâmetros:
 
 ```java
 @Observed(name = "order.payment")
+@TrackStep(name = "process-payment", type = ComponentType.BUSINESS)
 @ObservationTag(key = "tenant_id", expression = "#tenantId", highCardinality = false)
 @ObservationTag(key = "order_id", expression = "#orderId", highCardinality = true)
 @ObservationTag(key = "status", expression = "#result?.status()", highCardinality = false)
-public PaymentResult executePayment(String tenantId, String orderId, PaymentDetails details) {
+public PaymentResult executePayment(String tenantId, 
+                                    String orderId, 
+                                    @ObservationTag(key = "customer_cpf") String cpf,
+                                    PaymentDetails details) {
+    // 💡 ZERO linhas de MDC.put("order_id", ...) ou MDC.remove(...)!
+    // As variáveis 'flow', 'step', 'step.type', 'tenant_id', 'order_id' e 'customer_cpf'
+    // já estão ativas no MDC do SLF4J para todos os logs executados dentro deste escopo.
+    log.info("Processando pagamento da transação");
     return paymentProcessor.pay(details);
 }
 ```
 
+### Ciclo de Vida e Isolamento Seguro no MDC (Stack Semantics)
+* **Injeção Pré-Execução**: Parâmetros e expressões SpEL (sem `#result`) são avaliados antes do método e inseridos imediatamente no MDC do SLF4J (`tag.mdc() == true` por padrão).
+* **Limpeza Garantida em `finally`**: Ao término da execução (mesmo em caso de `RuntimeException` ou erro de infraestrutura), o `SpelObservationAspect` e o `FlowTrackingAspect` restauram os valores anteriores do MDC ou executam `MDC.remove()`.
+* **Segurança Concorrente em Thread Pools**: Garante que pools de threads (`@Async`, `ExecutorService`, TomCat Workers) nunca sofram contaminação de contexto (*context leakage*) entre diferentes requisições.
+* **Escopos Aninhados**: Se um método interno sobrescrever temporariamente uma chave (ex: `tenant`), o escopo anterior é preservado e restaurado automaticamente assim que o método interno encerra.
+
 ### Proteção Contra Explosão de Cardinalidade
-O starter inspeciona as chaves de tags dinâmicas. Chaves identificadas como potencialmente perigosas para séries temporais (`user_id`, `cpf`, `email`, `document`, `order_id`, `account_id`, etc.) são **automaticamente promovidas para tags de alta cardinalidade** (`getHighCardinalityKeyValues()`), sendo visíveis em traces e spans do OpenTelemetry, mas protegendo o TSDB (Prometheus/Datadog) contra esgotamento de memória.
+O starter inspeciona as chaves de tags dinâmicas. Chaves identificadas como potencialmente perigosas para séries temporais (`user_id`, `cpf`, `email`, `document`, `order_id`, `account_id`, etc.) são **automaticamente promovidas para tags de alta cardinalidade** (`getHighCardinalityKeyValues()`), sendo visíveis em traces e spans do OpenTelemetry e logs estruturados no MDC, mas protegendo o TSDB (Prometheus/Datadog) contra esgotamento de memória.
 
 ---
 
