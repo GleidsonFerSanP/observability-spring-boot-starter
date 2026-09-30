@@ -42,34 +42,18 @@ Nenhuma aplicação de microsserviço de negócio deve precisar implementar:
 
 ---
 
-## 🏗️ Estrutura Multi-Módulo (Padrão Spring Boot)
+## 🏗️ Estrutura Multi-Módulo Corporativa
 
 ```text
 observability-spring-boot-starter-project/
 ├── pom.xml                                          # Parent POM (BOM & dependências unificadas)
 │
-├── observability-spring-boot-starter-core/          # MÓDULO CORE (POJO / Framework-agnostic)
-│   ├── annotation/                                  # @TrackFlow, @TrackStep, @LogLeg, @ObservationTag, @MaskField
-│   ├── engine/                                      # ObservabilityEngine SPI, EngineCapabilities, Datadog & Micrometer Engines
-│   ├── flow/                                        # FlowContext, LatencyAttributionEngine, FlowExecution, FlowDimensions
-│   ├── leg/                                         # LegContext, SpelMaskingService
-│   ├── correlation/                                 # CorrelationContext (W3C / MDC / HTTP Headers)
-│   ├── feature/                                     # FlowFeatureEvaluationListener (Feature flag SPI)
-│   └── alerting/                                    # AlertDispatcher, AlertEvent, AlertNotifier
-│
-├── observability-spring-boot-starter-autoconfigure/ # MÓDULO AUTOCONFIGURE (Spring Boot AutoConfiguration)
-│   ├── aspect/                                      # FlowTrackingAspect, SpelObservationAspect, LegLoggingAspect
-│   ├── async/                                       # ObservabilityTaskDecorator (MDC & ContextSnapshot propagation)
-│   ├── alerting/                                    # LogAlertNotifier, WebhookAlertNotifier
-│   ├── feign/                                       # FeignObservabilityAutoConfiguration
-│   ├── jdbc/                                        # JdbcObservabilityAutoConfiguration (HikariPoolAlertWatcher)
-│   ├── kafka/                                       # KafkaObservabilityAutoConfiguration
-│   ├── resilience/                                  # ResilienceObservabilityAutoConfiguration (CircuitBreakerAlertListener)
-│   ├── sqs/                                         # SqsObservabilityAutoConfiguration
-│   └── LoggingObservationHandler.java               # Formatação e logging estruturado de Observation
-│
-└── observability-spring-boot-starter/               # STARTER AGREGADOR (Dependência única importada pelas apps)
-    └── pom.xml
+├── observability-api/                               # Contratos puros, anotações (@TrackFlow, @TrackStep, @FlowDimension, @LogLeg)
+├── observability-core/                              # Domínio de observabilidade (FlowSemanticContext, CardinalityPolicy, OpenTelemetry API pura)
+├── observability-autoconfigure/                     # Auto-configurações Spring Boot 3, EnvironmentPostProcessor, TracingRuntimeDetector
+├── observability-spring-boot-starter/               # Starter agregador corporativo plug-and-play
+├── observability-test/                              # Test Harness e Matriz de Conformidade (Single Producer, detecção de conflitos)
+└── observability-legacy-compat/                     # Módulo ponte de compatibilidade para transição de legados
 ```
 
 ---
