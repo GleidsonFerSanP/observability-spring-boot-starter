@@ -6,12 +6,25 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 
 ---
 
-## 1. Toggles Mestres e Granulares
+## 1. Configurações Globais, Perfis e Single-Producer
 
 | Propriedade | Tipo | Padrão | Descrição |
 |---|---|---|---|
 | `observability.enabled` | `boolean` | `true` | **Master Switch**. Quando `false`, inibe 100% dos aspectos, interceptores, filtros e listeners do starter na JVM. |
-| `observability.engine` | `String` | `micrometer` | **Engine de Telemetria**. Seleciona o adaptador da SPI (`micrometer` \| `datadog` \| `opentelemetry`). Em produção sob Datadog APM/DSM, definir como `datadog`. Em local/CI, manter `micrometer`. |
+| `observability.profile` | `String` | `datadog` | **Perfil de Telemetria Corporativo**. Opções: `datadog` (padrão corporativo), `prometheus` (scraping local/Grafana), ou `custom`. Determina as convenções semânticas e o registry ativo. |
+| `observability.engine` | `String` | `datadog` | **Engine da SPI**. Seleciona o adaptador (`datadog` \| `micrometer` \| `opentelemetry`). Em produção sob Datadog APM/DSM, manter `datadog`. Em local/CI, pode ser alternado para `micrometer`. |
+| `observability.metrics.allow-dual-export` | `boolean` | `false` | **Guarda de Exportação Duplicada**. Se `false`, o `ObservabilityTopologyValidator` aborta o boot (*fail-fast*) caso detecte múltiplos registries incompatíveis (ex: Datadog + Prometheus) ativos simultaneamente, prevenindo faturas SaaS duplicadas. |
+| `observability.metrics.exporters` | `List<String>` | `["datadog"]` | Lista de exportadores de métricas autorizados. |
+| `observability.tracing.engine` | `String` | `auto` | Modo do motor de tracing: `auto` (detecta `-javaagent`), `datadog-agent`, `otel-agent` ou `none`. |
+| `observability.tracing.duplicate-policy` | `String` | `fail` | Política ao detectar múltiplos agentes de tracing na JVM: `fail` (*fail-fast* com exceção) ou `warn` (apenas log de alerta). |
+| `observability.validation.mode` | `String` | `fail-fast` | Modo do validador de topologia: `fail-fast` (lança `IllegalStateException` no boot) ou `warn` (apenas emite logs de warning). |
+
+---
+
+## 2. Toggles Granulares de Infraestrutura e Aspectos
+
+| Propriedade | Tipo | Padrão | Descrição |
+|---|---|---|---|
 | `observability.flow-tracking.enabled` | `boolean` | `true` | Ativa/desativa o aspecto `@TrackFlow` e a instrumentação de decomposição de latência do `FlowTrackingAspect`. |
 | `observability.leg-logging.enabled` | `boolean` | `true` | Ativa/desativa a auditoria estruturada forense de pernas (`AUDIT_LEG_LOGGER`) e o aspecto `@LogLeg`. |
 | `observability.spel-observation.enabled` | `boolean` | `true` | Ativa/desativa a extração dinâmica de tags via SpEL através do aspecto `SpelObservationAspect`. |
@@ -19,17 +32,21 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 | `observability.feign.enabled` | `boolean` | `true` | Ativa/desativa a injeção automática de headers W3C TraceContext e `X-Correlation-Id` em clientes Feign. |
 | `observability.resilience.enabled` | `boolean` | `true` | Ativa/desativa o listener de transição de estado de Circuit Breakers Resilience4j. |
 | `observability.jdbc.enabled` | `boolean` | `true` | Ativa/desativa o watchdog e métricas de starvation de conexões do HikariCP. |
-| `observability.alerting.enabled` | `boolean` | `true` | Ativa/desativa o barramento e o despachador de eventos `AlertDispatcher`. |
 | `observability.async-decorator.enabled` | `boolean` | `true` | Ativa/desativa o `ObservabilityTaskDecorator` para propagação de contexto em threads assíncronas. |
-| `observability.observation-handler.enabled` | `boolean` | `true` | Ativa/desativa o log de ciclo de vida (`Starting/Finished operation`) do `LoggingObservationHandler`. |
+| `observability.observation-handler.enabled` | `boolean` | `false` | Ativa/desativa o log de ciclo de vida (`Starting/Finished operation`) do `LoggingObservationHandler` (desabilitado por padrão para evitar ruído). |
+| `observability.infrastructure.kafka-lag.enabled` | `boolean` | `false` | Ativa polling in-JVM de lag Kafka via `AdminClient`. Em produção sob Datadog DSM, manter `false`. |
+| `observability.infrastructure.sqs-polling.enabled` | `boolean` | `false` | Ativa polling in-JVM de profundidade de filas SQS via AWS SDK. Em produção sob Datadog DSM, manter `false`. |
+| `observability.logs.structured` | `boolean` | `true` | Formata logs em JSON estruturado com campos semânticos para indexação. |
+| `observability.logs.payload` | `boolean` | `false` | **Opt-in de Auditoria de Payloads**. Por padrão `false` (conformidade com LGPD/PCI-DSS). |
 
 ---
 
-## 2. Configurações do Sistema de Alertas (`observability.alerting.*`)
+## 3. Configurações do Sistema de Alertas (`observability.alerting.*`)
 
 | Propriedade | Tipo | Padrão | Descrição |
 |---|---|---|---|
-| `observability.alerting.webhook-url` | `String` | `null` | URL HTTP para onde o `WebhookAlertNotifier` enviará alertas (ex: webhook do Alertmanager, Slack ou PagerDuty). Se nula, o notifier HTTP permanece desabilitado. |
+| `observability.alerting.enabled` | `boolean` | `false` | Master switch do despachador de eventos de alerta in-app. |
+| `observability.alerting.webhook-url` | `String` | `null` | URL HTTP para onde o `WebhookAlertNotifier` enviará alertas (ex: Alertmanager ou Slack). |
 | `observability.alerting.thresholds.default-flow-sla-ms` | `long` | `2000` | SLA padrão de duração do fluxo (em milissegundos). Estouros disparam alerta `FLOW_LATENCY_SLA_BREACH`. |
 | `observability.alerting.thresholds.default-step-sla-ms` | `long` | `800` | SLA padrão de subprocessos/steps. Estouros disparam alerta `INTEGRATION_LATENCY_SLA_BREACH`. |
 | `observability.alerting.thresholds.flow-slas.<nome-do-fluxo>` | `Map<String, Long>` | `{}` | SLAs customizados por nome de fluxo (ex: `"POST /payments": 500`). |
@@ -41,54 +58,66 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 
 ---
 
-## 3. Exemplo Completo de `application.yml`
+## 4. Exemplos de Configuração
+
+### 4.1 Perfil de Produção Corporativo (Datadog Default)
 
 ```yaml
 # ==============================================================================
-# CONFIGURAÇÃO CORPORATIVA DO STARTER DE OBSERVABILIDADE
+# PRODUÇÃO: Datadog APM, DSM e Métricas (Sem Polling in-JVM redundante)
 # ==============================================================================
 observability:
-  enabled: true # Master switch
-  engine: micrometer # micrometer (dev/test) | datadog (prod) | opentelemetry
+  enabled: true
+  profile: datadog
+  engine: datadog
 
-  # Toggles Granulares (opcional, todos são true por padrão)
-  flow-tracking:
-    enabled: true
-  leg-logging:
-    enabled: true
-  spel-observation:
-    enabled: true
-  correlation:
-    enabled: true
-  feign:
-    enabled: true
-  resilience:
-    enabled: true
-  jdbc:
-    enabled: true
-  async-decorator:
-    enabled: true
-  observation-handler:
-    enabled: true
+  metrics:
+    allow-dual-export: false # Proteção ativa contra custo duplicado
+    exporters:
+      - datadog
 
-  # Configuração de Alertas e SLAs
-  alerting:
-    enabled: true
-    webhook-url: "http://alertmanager.empresa.internal/api/v1/alerts"
-    thresholds:
-      default-flow-sla-ms: 1200
-      default-step-sla-ms: 600
-      flow-slas:
-        "GET /api/v1/orchestrator/users/{userId}": 1000
-        "POST /api/v1/orchestrator/users": 500
-      step-slas:
-        "API Customer (GET /customers/{userId})": 400
-        "API Billing (GET /billing/accounts/{userId})": 500
-      hikari-pending-threads: 2
-      circuit-breaker-open: true
-      kafka-lag-high: 100
-      sqs-backlog-high: 50
+  tracing:
+    engine: auto # Detecta dd-java-agent injetado no container
+    duplicate-policy: fail
+
+  validation:
+    mode: fail-fast # Bloqueia startup se houver conflito de topologia
+
+  infrastructure:
+    kafka-lag:
+      enabled: false # Delegado nativamente ao Datadog Data Streams Monitoring
+    sqs-polling:
+      enabled: false # Delegado nativamente ao Datadog Data Streams Monitoring
 ```
+
+### 4.2 Perfil de Desenvolvimento Local / CI (Prometheus / Grafana)
+
+```yaml
+# ==============================================================================
+# DESENVOLVIMENTO / CI: Prometheus Scrape Local & Grafana
+# ==============================================================================
+observability:
+  enabled: true
+  profile: prometheus
+  engine: micrometer
+
+  metrics:
+    allow-dual-export: false
+    exporters:
+      - prometheus
+
+  infrastructure:
+    kafka-lag:
+      enabled: true # Polling in-JVM ativo para alimentar queries PromQL locais
+    sqs-polling:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+
 
 ---
 

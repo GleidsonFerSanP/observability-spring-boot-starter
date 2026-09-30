@@ -22,20 +22,26 @@ Este documento detalha o desenho técnico, os padrões de engenharia de software
 
 ## 2. Estrutura Modular Multi-Módulo
 
-Seguindo o padrão de mercado oficial do Spring Boot (Spring Framework Reference Guide):
+Seguindo o padrão de mercado oficial do Spring Boot (Spring Framework Reference Guide), o projeto é rigorosamente desacoplado em módulos com responsabilidades isoladas:
 
 ```text
 observability-spring-boot-starter-project/
-├── pom.xml                                          # Parent POM (BOM & dependências unificadas)
+├── pom.xml                                          # Parent POM (BOM & gerência unificada de dependências)
 │
-├── observability-spring-boot-starter-core/          # MÓDULO CORE (POJO / Framework-agnostic)
-│   ├── annotation/                                  # Anotações de negócio: @TrackFlow, @TrackStep, @LogLeg, @ObservationTag
+├── observability-api/                               # MÓDULO API (Zero dependências externas, pure Java)
+│   ├── annotation/                                  # Anotações de domínio: @TrackFlow, @TrackStep, @FlowDimension, @LogLeg, @ObservationTag
+│   └── dimension/                                   # Contratos de dimensão: FlowDimensions
+│
+├── observability-core/                              # MÓDULO CORE (POJO / Framework-agnostic)
 │   ├── flow/                                        # Modelos temporais: FlowExecution, StepExecution, LatencyAttributionEngine, FlowContext
 │   ├── leg/                                         # Auditoria forense: SpelMaskingService, LegContext
 │   ├── correlation/                                 # Contexto distribuído: CorrelationContext (W3C TraceContext, MDC)
-│   └── alerting/                                    # Barramento de eventos: AlertDispatcher, AlertEvent, AlertNotifier
+│   ├── alerting/                                    # Barramento de eventos: AlertDispatcher, AlertEvent, AlertNotifier
+│   ├── cardinality/                                 # Governança de cardinalidade: CardinalityPolicy
+│   ├── engine/                                      # Engine SPI & adaptadores: ObservabilityEngine, DatadogObservabilityEngine, MicrometerObservabilityEngine
+│   └── runtime/                                     # Detecção de agentes e engines: TracingRuntimeDetector
 │
-├── observability-spring-boot-starter-autoconfigure/ # MÓDULO AUTOCONFIGURE (Spring Boot AutoConfiguration)
+├── observability-autoconfigure/                     # MÓDULO AUTOCONFIGURE (Spring Boot AutoConfiguration)
 │   ├── aspect/                                      # AOP: FlowTrackingAspect, SpelObservationAspect, LegLoggingAspect
 │   ├── async/                                       # Propagação: ObservabilityTaskDecorator
 │   ├── correlation/                                 # Filtro HTTP Servlet: CorrelationIdFilter
@@ -44,11 +50,18 @@ observability-spring-boot-starter-project/
 │   ├── sqs/                                         # Auto-instrumentação: SqsObservabilityAutoConfiguration
 │   ├── jdbc/                                        # Pool Watchdog: JdbcObservabilityAutoConfiguration
 │   ├── resilience/                                  # Circuit Breaker: ResilienceObservabilityAutoConfiguration
+│   ├── validator/                                   # Fail-fast de topologia: ObservabilityTopologyValidator
 │   └── resources/META-INF/spring/
 │       └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
 │
-└── observability-spring-boot-starter/               # STARTER UMBRELLA (Dependency aggregator)
-    └── pom.xml                                      # Exporta core + autoconfigure + micrometer
+├── observability-spring-boot-starter/               # STARTER UMBRELLA (Dependency aggregator)
+│   └── pom.xml                                      # Exporta api + core + autoconfigure + micrometer
+│
+├── observability-test/                              # MÓDULO DE TESTE (Harness e Asserções)
+│   └── src/main/java/                               # ApplicationContextRunner utilities, TopologyAssertions
+│
+└── observability-legacy-compat/                     # COMPATIBILIDADE RETROATIVA
+    └── src/main/java/                               # Bridges e adaptadores para versões de transição
 ```
 
 ---
@@ -193,4 +206,47 @@ Localizada em `com.empresa.platform.observability.core.engine`:
 | **Data Streams (DSM)** | Ativo via Datadog Agent (`requiresInJvmLagPolling() == false`) | Requer Binders in-JVM (`requiresInJvmLagPolling() == true`) |
 | **Ponte de Rastreio** | OpenTelemetry API Bridge (`DD_TRACE_OTEL_ENABLED=true`) | Micrometer Observation API |
 | **Zero Vendor Jars** | Sim (opera via padrões abertos e JVM agent) | Sim (open-source standard) |
+
+---
+
+## 7. Política "Single-Producer Per Signal" e OpenTelemetry API Pura
+
+### 7.1 O Risco da Concorrência de Motores de Telemetria
+Em ambientes corporativos com observabilidade distribuída, um dos erros mais comuns e danosos é a inclusão indiscriminada de SDKs de telemetria na mesma aplicação:
+* **Concorrência de Tracers na JVM**: Se a aplicação empacotar `opentelemetry-sdk` ou `micrometer-tracing-bridge-otel` e rodar sob o `dd-java-agent`, dois motores de tracing competem pelos interceptadores de thread e headers HTTP/W3C. O resultado são traces quebrados (spans desconexos), perda do `parent_id` e sobrecarga de CPU de até 30%.
+* **Duplicação de Ingestão e Explosão de Faturas SaaS**: Exportar as mesmas métricas para Datadog e Prometheus simultaneamente sem governança dobra o tráfego de rede e o custo de ingestão em plataformas de nuvem.
+
+### 7.2 A Regra da OpenTelemetry API Pura
+Para eliminar esse risco, o starter adota a seguinte diretriz de dependências:
+1. O starter depende **exclusivamente da especificação aberta `io.opentelemetry:opentelemetry-api`**, sem embutir `opentelemetry-sdk` nem exportadores OTLP.
+2. Em produção sob Datadog, o agente `-javaagent:dd-java-agent.jar` (com a flag `DD_TRACE_OTEL_ENABLED=true`) injeta a implementação canônica do Tracer. A aplicação manipula spans e atributos de forma agnóstica via API aberta, enquanto o agente garante o envio confiável sem overhead duplicado.
+3. Em testes ou ambientes locais, bridges abertos podem ser ativados de forma controlada sem poluir o binário de produção.
+
+### 7.3 Validação de Topologia e Trava Fail-Fast
+O módulo `observability-autoconfigure` implementa o `ObservabilityTopologyValidator` e o `TracingRuntimeDetector`:
+* **Detecção de Agentes Concorrentes**: Inspeciona os argumentos de runtime da JVM (`ManagementFactory.getRuntimeMXBean().getInputArguments()`). Caso múltiplos agentes incompatíveis (ex: Datadog Agent + OTel Java Agent) sejam detectados, o startup emite alertas imediatos.
+* **Perfis de Métricas (`observability.profile`)**:
+  - `datadog` (padrão): Ativa apenas o ecossistema Datadog.
+  - `prometheus`: Ativa apenas o registro do Prometheus para scraping.
+* **Dual-Export Guard**: Se a aplicação carregar acidentalmente múltiplos registries incompatíveis sem a permissão explícita `observability.metrics.allow-dual-export: true`, o inicializador lança `IllegalStateException` no boot (*fail-fast*), bloqueando a inicialização antes que custos indevidos sejam gerados.
+
+---
+
+## 8. Governança Estrita de Cardinalidade (`CardinalityPolicy`)
+
+A explosão de cardinalidade (*cardinality bomb*) ocorre quando atributos com alta variabilidade (IDs de usuário, CPFs, tokens UUID, timestamps) são injetados indevidamente como tags de métricas em bancos de séries temporais (TSDB), causando esgotamento de memória (OOM) no Prometheus ou custos astronômicos de métricas customizadas no Datadog.
+
+O starter estabelece a separação rígida implementada em [`CardinalityPolicy`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-core/src/main/java/com/empresa/platform/observability/core/cardinality/CardinalityPolicy.java):
+
+```mermaid
+flowchart LR
+    Attr["Atributo / Tag de Negócio"] --> Check{Alta Cardinalidade? (IDs, Tokens, Mensagens)}
+    Check -- Não (Baixa: status, variant, feature) --> Metrics["MeterRegistry (Prometheus / Datadog Metrics)"]
+    Check -- Sim (Alta: userId, orderId) --> Spans["Span Attributes (OTel / Datadog Trace Explorer)"]
+    Check -- Sim --> Logs["MDC / Structured Logs (Grafana Loki)"]
+```
+
+1. **Baixa Cardinalidade (Métricas / TSDB)**: Apenas dimensões finitas e previsíveis (`flow.name`, `flow.variant`, `step.name`, `status`, `feature.name`).
+2. **Alta Cardinalidade (Tracing & Logs)**: Expressões SpEL avaliadas dinamicamente via `@ObservationTag(highCardinality = true)` são roteadas exclusivamente para os atributos de Span e campos de log estruturado, permitindo consultas forenses exatas sem degradar o TSDB.
+
 
