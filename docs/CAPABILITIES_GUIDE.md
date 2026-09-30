@@ -1,6 +1,6 @@
 # Guia de Capacidades do Starter (Capabilities Guide)
 
-Este documento descreve detalhadamente cada uma das capacidades do starter, explicando como utilizá-las na prática e demonstrando exemplos de código.
+Este documento descreve detalhadamente cada uma das capacidades do starter, explicando como utilizá-las na prática e demonstrando exemplos de código em estrita conformidade com a especificação técnica corporativa **Candidate Architecture v2**.
 
 ---
 
@@ -31,29 +31,81 @@ O starter automaticamente:
 
 ---
 
-## 2. Rastreamento de Subprocessos (`@TrackStep`)
+## 2. Rastreamento de Subprocessos (`@TrackStep`) e Catálogo de Componentes (`ComponentType`)
 
-Permite fatiar e atribuir latência a etapas e dependências de infraestrutura:
+Permite fatiar e atribuir latência a etapas de processamento e dependências de infraestrutura de forma declarativa e não-intrusiva:
 
 ```java
 @Component
 public class PaymentGatewayClient {
 
-    @TrackStep(value = "payment-gateway-charge", type = ComponentType.FEIGN_HTTP)
+    @TrackStep(value = "payment-gateway-charge", type = ComponentType.FEIGN)
     public ChargeResult charge(PaymentRequest request) {
         return feignClient.executeCharge(request);
     }
 }
 ```
 
-### Tipos de Componentes (`ComponentType`):
-- `FEIGN_HTTP`: Clientes REST e integrações HTTP externas.
-- `DATABASE`: Operações de persistência, consultas SQL e transações.
-- `KAFKA_PRODUCER` / `KAFKA_CONSUMER`: Mensageria Kafka.
-- `SQS_PRODUCER` / `SQS_CONSUMER`: Filas AWS SQS.
-- `REDIS`: Cache e operações em memória.
-- `RESILIENCE`: Fallbacks e retries.
-- `INTERNAL`: Subprocessos pesados e algoritmos de cálculo locais.
+### 2.1 Catálogo Canônico de Tipos de Componentes (`ComponentType`):
+
+O enum [`ComponentType`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ComponentType.java) padroniza a categorização arquitetural dos subprocessos (Candidate Architecture v2 - Seção 50):
+
+| Categoria | `ComponentType` | Descrição & Quando Usar |
+|---|---|---|
+| **HTTP & RPC** | `HTTP` | Clientes REST genéricos (`RestClient`, `WebClient`, `HttpClient` nativo do Java). |
+| | `FEIGN` | Clientes declarativos Spring Cloud OpenFeign para APIs REST downstream. |
+| | `GRPC` | Chamadas síncronas ou streaming de alta performance via Protocol Buffers / gRPC. |
+| **Persistência & Cache** | `DATABASE` | Operações em bancos relacionais ou NoSQL (JPA/Hibernate, consultas SQL, JDBC, MongoDB). |
+| | `CACHE` | Leituras e escritas em camadas de cache em memória ou distribuído (Redis, Caffeine, Hazelcast). |
+| **Mensageria & Filas** | `KAFKA` | Mensageria genérica Apache Kafka (uso simplificado/unificado). |
+| | `KAFKA_PRODUCER` | Publicação ativa de records/eventos em tópicos Kafka (`KafkaTemplate`). |
+| | `KAFKA_CONSUMER` | Processamento e consumo de mensagens de tópicos Kafka (`@KafkaListener`). |
+| | `SQS` | Mensageria genérica AWS Simple Queue Service. |
+| | `SQS_PRODUCER` | Envio de mensagens para filas AWS SQS (`SqsTemplate`). |
+| | `SQS_CONSUMER` | Consumo e processamento de mensagens de filas AWS SQS (`@SqsListener`). |
+| | `SNS` | Publicação fan-out em tópicos do AWS Simple Notification Service. |
+| | `JMS` | Mensageria corporativa empresarial legada (ActiveMQ, IBM MQ, Artemis). |
+| **Execução Local & Negócio** | `BUSINESS` | **Padrão do `@TrackStep`**. Regras de negócio essenciais, validações de domínio e cálculos financeiros. |
+| | `INTERNAL` | Processamento técnico pesado, transformações de dados in-memory, parsing, hashing ou criptografia. |
+| | `EXECUTOR` | Tarefas assíncronas delegadas a thread-pools secundários, `CompletableFuture` ou workers de background. |
+| **Padrões de Resiliência** | `RETRY` | Execuções repetidas e tentativas com políticas de backoff operacional. |
+| | `CIRCUIT_BREAKER` | Subprocessos protegidos por disjuntores de falha (Resilience4j). |
+| | `BULKHEAD` | Isolamento de concorrência e contenção de saturação de threads. |
+| | `RATE_LIMITER` | Controle de vazão e estrangulamento de requisições por segundo. |
+| **Extensibilidade** | `CUSTOM` | Etapas customizadas de domínio que extrapolam as categorias padronizadas acima. |
+
+### 2.2 Métodos Utilitários do Enum `ComponentType`
+
+O enum disponibiliza métodos utilitários para consultas semânticas em runtime:
+
+```java
+ComponentType type = ComponentType.KAFKA_PRODUCER;
+
+type.isIntegration(); // true  (indica se é dependência externa / I/O de rede ou disco)
+type.isMessaging();   // true  (indica se pertence ao ecossistema de mensageria assíncrona)
+type.isResilience();  // false (indica se é barreira de resiliência: RETRY, CIRCUIT_BREAKER, etc.)
+type.isLocal();       // false (indica se é processamento in-memory: BUSINESS, INTERNAL, EXECUTOR)
+type.getCategory();   // "MESSAGING" (categoria macro para agrupamento em dashboards analíticos)
+```
+
+### 2.3 As 4 Grandes Utilidades Arquiteturais do `ComponentType`
+
+1. **Atribuição Precisa no Latency Attribution Engine**:
+   - Alimenta automaticamente a tag dimensional `type` nas métricas canônicas:
+     - `observability.flow.component.work.duration` (esforço nominal)
+     - `observability.flow.component.attributed.duration` (contribuição normalizada no wall-clock)
+   - Permite consultas analíticas transversais em Prometheus/Grafana:
+     ```promql
+     # Distribuição da latência do fluxo por tipo de componente
+     sum by (type) (rate(observability_flow_component_attributed_duration_seconds_sum{flow="OrderCheckout"}[5m]))
+     ```
+2. **Topologia Dinâmica no Datadog APM & Request Flow Maps**:
+   - O `DatadogObservabilityEngine` injeta `step.type` como atributo canônico de span e tag de observação.
+   - O Datadog Trace Explorer e o Service Map utilizam esse atributo para desenhar dependências e categorizar visualmente a borda do serviço.
+3. **Parametrização Granular de SLAs**:
+   - Permite que a esteira de monitoramento aplique limiares distintos de SLA baseados na categoria do componente (ex: tolerância de 20ms para `CACHE`, 300ms para `DATABASE`, 1500ms para `HTTP`).
+4. **Proteção Rigorosa Contra Explosão de Cardinalidade**:
+   - Por ser um enum fechado e finito, garante **risco zero** de estouro de memória no TSDB (Prometheus / Datadog Metrics), diferentemente de strings livres informadas manualmente por desenvolvedores.
 
 ---
 
@@ -78,6 +130,15 @@ public UserResponse register(@RequestBody UserRequest request) {
     return userService.register(request);
 }
 ```
+
+### Enums de Suporte a Pernas de Auditoria:
+* **`LegType`**: Define o sentido arquitetural da perna auditada:
+  - `INBOUND`: Requisições recebidas pela aplicação (controladores HTTP, ouvintes de fila).
+  - `OUTBOUND`: Chamadas enviadas para fora da aplicação (clientes HTTP/Feign, publicadores).
+* **`LegPhase`**: Fases do ciclo de vida registradas estruturadamente:
+  - `START` / `REQUEST`: Início da execução e dados de entrada.
+  - `END` / `RESPONSE`: Conclusão com sucesso e dados de retorno.
+  - `ERROR`: Falha ou exceção capturada durante a perna.
 
 ### Regras de Governança de Dados (LGPD / PCI-DSS):
 * **`includePayload = false` por padrão**: Em conformidade com a especificação técnica Candidate v2, o starter **não** audita corpos de mensagens a menos que explicitado com `includePayload = true` ou configurado com `@MaskField`.
@@ -111,10 +172,10 @@ O starter inspeciona as chaves de tags dinâmicas. Chaves identificadas como pot
 
 ## 5. Propagação de Contexto e Correlation ID
 
-* **Entrada**: O [`CorrelationIdFilter`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-autoconfigure/src/main/java/com/empresa/platform/observability/autoconfigure/CorrelationIdFilter.java) captura o cabeçalho `X-Correlation-Id` da requisição HTTP. Caso não enviado pelo cliente, um UUID canônico é gerado.
+* **Entrada**: O `CorrelationIdFilter` captura o cabeçalho `X-Correlation-Id` da requisição HTTP. Caso não enviado pelo cliente, um UUID canônico é gerado.
 * **MDC**: O `correlation_id` e o `traceId` são injetados no MDC do SLF4J, aparecendo automaticamente em todas as linhas de log.
 * **Saída (Feign)**: O `observabilityFeignRequestInterceptor` injeta transparentemente o `X-Correlation-Id` e o `x-trace-id` nas chamadas downstream.
-* **Threads Assíncronas**: O [`ObservabilityTaskDecorator`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-autoconfigure/src/main/java/com/empresa/platform/observability/autoconfigure/async/ObservabilityTaskDecorator.java) clona e restaura o MDC e os snapshots de observação através de *thread-pools* e tarefas `@Async`.
+* **Threads Assíncronas**: O `ObservabilityTaskDecorator` clona e restaura o MDC e os snapshots de observação através de *thread-pools* e tarefas `@Async`.
 
 ---
 
@@ -139,13 +200,17 @@ alertDispatcher.dispatch(AlertEvent.of(
 ));
 ```
 
-### Tipos de Alertas Nativos:
-- `CIRCUIT_BREAKER_OPEN`: Disjuntor Resilience4j entrou em estado OPEN.
-- `FLOW_LATENCY_SLA_BREACH`: Duração do fluxo ultrapassou o limiar de SLA configurado.
-- `INTEGRATION_LATENCY_SLA_BREACH`: Dependência externa ultrapassou o SLA de step.
-- `DATABASE_POOL_STARVATION`: Esgotamento de conexões pendentes no HikariCP.
-- `KAFKA_LAG_HIGH`: Lag do grupo de consumidores ultrapassou o limite.
-- `SQS_BACKLOG_HIGH`: Fila SQS acumulou backlog acima do limiar.
+### Catálogo Completo de Tipos de Alertas (`AlertType`):
+| `AlertType` | Severidade Padrão | Descrição do Evento |
+|---|---|---|
+| `CIRCUIT_BREAKER_OPEN` | `CRITICAL` | Disjuntor Resilience4j entrou em estado OPEN por taxa de falhas/lentas. |
+| `CIRCUIT_BREAKER_DEGRADED` | `WARNING` | Disjuntor entrou em HALF_OPEN (tentando auto-recuperação parcial). |
+| `FLOW_LATENCY_SLA_BREACH` | `WARNING` | Duração do fluxo ultrapassou o limiar de SLA fim a fim configurado. |
+| `INTEGRATION_LATENCY_SLA_BREACH` | `WARNING` | Subprocesso ou integração externa violou o SLA individual configurado. |
+| `FLOW_STEP_INTERRUPTION` | `CRITICAL` | Subprocesso sofreu falha não tratada ou interrupção abrupta no fluxo. |
+| `DATABASE_POOL_STARVATION` | `CRITICAL` | Esgotamento crítico de conexões com threads bloqueadas no HikariCP. |
+| `KAFKA_LAG_HIGH` | `WARNING` | Acúmulo de lag do grupo de consumidores Kafka acima do limiar. |
+| `SQS_BACKLOG_HIGH` | `WARNING` | Fila SQS acumulou backlog de mensagens acima do limiar configurado. |
 
 ### Criando um Notificador Customizado (Ex: Slack/Teams):
 Basta registrar um `@Bean` implementando `AlertNotifier`:
@@ -177,10 +242,9 @@ observability:
 ```
 
 ### O que o `DatadogObservabilityEngine` entrega nativamente:
-1. **Request Flow Maps Dinâmicos**: Injeta tags de span (`flow.name`, `flow.variant`, `flow.step`, `flow.status`, `feature.name`, `feature.variant`) que permitem ao Datadog Trace Explorer projetar e comparar visualmente caminhos de rotas e migrações operacionais.
+1. **Request Flow Maps Dinâmicos**: Injeta tags de span (`flow.name`, `flow.variant`, `flow.step`, `step.type`, `flow.status`, `feature.name`, `feature.variant`) que permitem ao Datadog Trace Explorer projetar e comparar visualmente caminhos de rotas e migrações operacionais.
 2. **Supressão de Polling in-JVM com Data Streams Monitoring (DSM)**:
    - Reporta `requiresInJvmLagPolling() == false`.
    - Com o `dd-java-agent` ativo com `-Ddd.data.streams.enabled=true`, o Datadog monitora a latência de ponta a ponta (pathway latency) e o lag de mensageria diretamente nos brokers e filas, eliminando consultas repetitivas de polling in-JVM via `AdminClient` ou `GetQueueAttributes`.
 3. **Ponte Não-Intrusiva OpenTelemetry**:
    - Injeta atributos de span via `OtelSpanBridge` capturados automaticamente pelo Datadog Java Agent via `DD_TRACE_OTEL_ENABLED=true`, sem exigir nenhum jar fechado ou proprietário no classpath da aplicação.
-

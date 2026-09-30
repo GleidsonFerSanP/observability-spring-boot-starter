@@ -24,8 +24,8 @@ Este documento especifica o catálogo unificado de telemetria produzido pelo **O
 | Métrica | Tipo | Unidade | Tags / Dimensões | Descrição Semântica |
 |---|---|---|---|---|
 | `observability.flow.duration` | Timer | Segundos | `flow`, `status`, `variant`, `feature` | Tempo total de relógio (*wall-clock*) percebido pelo cliente desde o início até o término do fluxo. |
-| `observability.flow.component.work.duration` | Timer | Segundos | `flow`, `component`, `status`, `variant`, `feature` | Duração nominal de esforço gasto em um subprocesso/componente específico (soma de durações reais). |
-| `observability.flow.component.attributed.duration` | Timer | Segundos | `flow`, `component`, `status`, `variant`, `feature` | Duração temporal atribuída a este componente na linha do tempo concorrente (*normalized wall-clock contribution*). |
+| `observability.flow.component.work.duration` | Timer | Segundos | `flow`, `component`, `type`, `status`, `variant`, `feature` | Duração nominal de esforço gasto em um subprocesso/componente específico (soma de durações reais). Tag `type` derivada de `ComponentType`. |
+| `observability.flow.component.attributed.duration` | Timer | Segundos | `flow`, `component`, `type`, `status`, `variant`, `feature` | Duração temporal atribuída a este componente na linha do tempo concorrente (*normalized wall-clock contribution*). Tag `type` derivada de `ComponentType`. |
 | `observability.flow.unattributed.duration` | Timer | Segundos | `flow`, `variant`, `feature` | Latência interna não atribuída a nenhum `@TrackStep` (tempo de computação pura, serialização ou steps não instrumentados). |
 | `observability.flow.parallel.overlap.duration` | Timer | Segundos | `flow`, `variant`, `feature` | Tempo economizado graças à concorrência / paralelismo (Diferença entre o esforço nominal bruto e o tempo de relógio consumido). |
 | `observability.flow.interruption` | Counter | Unidades | `flow`, `step`, `error`, `variant`, `feature` | Quantidade de interrupções abruptas ou falhas não tratadas ocorridas durante a execução de fluxos de negócio. |
@@ -89,9 +89,9 @@ Durante o ciclo de vida de uma perna de integração externa auditada por `@LogL
 |---|---|---|
 | `leg_number` | `1`, `2` | Número sequencial da perna de integração dentro da thread atual. |
 | `leg_parent` | `1` | Número da perna pai (em caso de chamadas encadeadas). |
-| `leg_type` | `OUTBOUND`, `DATABASE`, `MESSAGING` | Categoria arquitetural da integração. |
+| `leg_type` | `INBOUND`, `OUTBOUND` | Direção arquitetural da integração baseada no enum `LegType`. |
 | `leg_target` | `CustomerFeignClient` | Destino lógico ou físico invocado. |
-| `leg_phase` | `REQUEST`, `RESPONSE` | Fase do ciclo de vida da chamada. |
+| `leg_phase` | `REQUEST`, `RESPONSE`, `ERROR` | Fase do ciclo de vida da chamada baseada no enum `LegPhase`. |
 | `leg_duration_ms` | `142` | Tempo decorrido em milissegundos da chamada externa. |
 | `leg_status` | `SUCCESS`, `FAILED` | Resultado da operação. |
 
@@ -104,7 +104,7 @@ A tabela abaixo compara os atributos de spans injetados conforme o adaptador ati
 | Nome do Fluxo | `flow.name` e `flow` | `flow` | Identificador raiz do `@TrackFlow` no Datadog Request Flow Map e Prometheus. |
 | Variante de Rota | `flow.variant` e `variant` | `variant` | Segregação de migrações operacionais e canaries (`legacy` vs `new`). |
 | Nome do Subprocesso | `flow.step` e `step` | `step` | Nó filho do `@TrackStep` na árvore de execução. |
-| Tipo de Integração | `step.type` | `step.type` | Categoria arquitetural (`INTEGRATION_HTTP`, `DATABASE`, `CACHE`, etc.). |
+| Tipo de Componente | `step.type` | `step.type` | Categoria canônica do enum `ComponentType` (`HTTP`, `FEIGN`, `GRPC`, `DATABASE`, `CACHE`, `KAFKA_PRODUCER`, `KAFKA_CONSUMER`, `SQS_PRODUCER`, `SQS_CONSUMER`, `SNS`, `JMS`, `BUSINESS`, `INTERNAL`, `EXECUTOR`, `RETRY`, `CIRCUIT_BREAKER`, `BULKHEAD`, `RATE_LIMITER`, `CUSTOM`). |
 | Status de Conclusão | `flow.status` | `flow.status` | Estado final (`SUCCESS`, `DEGRADED_FALLBACK`, `INTERRUPTED`). |
 | Feature Flag Nome | `feature.name` | `feature` | Nome da feature flag que conduziu a rota. |
 | Feature Flag Variante | `feature.variant` | `variant` | Variante avaliada da feature flag. |

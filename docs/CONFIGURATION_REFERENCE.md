@@ -25,10 +25,10 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 
 | Propriedade | Tipo | Padrão | Descrição |
 |---|---|---|---|
-| `observability.flow-tracking.enabled` | `boolean` | `true` | Ativa/desativa o aspecto `@TrackFlow` e a instrumentação de decomposição de latência do `FlowTrackingAspect`. |
+| `observability.flow.enabled` / `observability.flow-tracking.enabled` | `boolean` | `true` | Ativa/desativa o aspecto `@TrackFlow` e a instrumentação de decomposição de latência do `FlowTrackingAspect`. |
+| `observability.correlation.enabled` | `boolean` | `true` | Ativa/desativa o filtro de Correlation ID para servlets (`CorrelationIdFilter`). |
 | `observability.leg-logging.enabled` | `boolean` | `true` | Ativa/desativa a auditoria estruturada forense de pernas (`AUDIT_LEG_LOGGER`) e o aspecto `@LogLeg`. |
 | `observability.spel-observation.enabled` | `boolean` | `true` | Ativa/desativa a extração dinâmica de tags via SpEL através do aspecto `SpelObservationAspect`. |
-| `observability.correlation.enabled` | `boolean` | `true` | Ativa/desativa o filtro de Correlation ID para servlets (`CorrelationIdFilter`). |
 | `observability.feign.enabled` | `boolean` | `true` | Ativa/desativa a injeção automática de headers W3C TraceContext e `X-Correlation-Id` em clientes Feign. |
 | `observability.resilience.enabled` | `boolean` | `true` | Ativa/desativa o listener de transição de estado de Circuit Breakers Resilience4j. |
 | `observability.jdbc.enabled` | `boolean` | `true` | Ativa/desativa o watchdog e métricas de starvation de conexões do HikariCP. |
@@ -43,22 +43,23 @@ Todas as propriedades possuem suporte nativo a *IDE Autocompletion* e validaçã
 
 ## 3. Configurações do Sistema de Alertas (`observability.alerting.*`)
 
+As propriedades de alarmística vinculam-se à classe `AlertingProperties` sob o prefixo `observability.alerting.*`:
+
 | Propriedade | Tipo | Padrão | Descrição |
 |---|---|---|---|
-| `observability.alerting.enabled` | `boolean` | `false` | Master switch do despachador de eventos de alerta in-app. |
-| `observability.alerting.webhook-url` | `String` | `null` | URL HTTP para onde o `WebhookAlertNotifier` enviará alertas (ex: Alertmanager ou Slack). |
-| `observability.alerting.thresholds.default-flow-sla-ms` | `long` | `2000` | SLA padrão de duração do fluxo (em milissegundos). Estouros disparam alerta `FLOW_LATENCY_SLA_BREACH`. |
-| `observability.alerting.thresholds.default-step-sla-ms` | `long` | `800` | SLA padrão de subprocessos/steps. Estouros disparam alerta `INTEGRATION_LATENCY_SLA_BREACH`. |
-| `observability.alerting.thresholds.flow-slas.<nome-do-fluxo>` | `Map<String, Long>` | `{}` | SLAs customizados por nome de fluxo (ex: `"POST /payments": 500`). |
-| `observability.alerting.thresholds.step-slas.<nome-do-step>` | `Map<String, Long>` | `{}` | SLAs customizados por nome de step (ex: `"API Customer": 300`). |
-| `observability.alerting.thresholds.hikari-pending-threads` | `int` | `1` | Limiar de threads bloqueadas aguardando conexão no pool antes de disparar `DATABASE_POOL_STARVATION`. |
-| `observability.alerting.thresholds.circuit-breaker-open` | `boolean` | `true` | Se `true`, dispara alerta `CIRCUIT_BREAKER_OPEN` com severidade `CRITICAL` imediatamente na abertura do disjuntor. |
-| `observability.alerting.thresholds.kafka-lag-high` | `long` | `100` | Limiar de lag de consumidor antes de disparar `KAFKA_LAG_HIGH`. |
-| `observability.alerting.thresholds.sqs-backlog-high` | `long` | `50` | Limiar de profundidade de fila antes de disparar `SQS_BACKLOG_HIGH`. |
+| `observability.alerting.enabled` | `boolean` | `true` | Master switch do despachador de eventos de alerta in-app (`AlertDispatcher`). |
+| `observability.alerting.webhook-url` | `String` | `null` | URL HTTP para envio de alertas via `WebhookAlertNotifier` (ex: Webhook Slack, Teams ou Alertmanager). |
+| `observability.alerting.default-flow-sla-ms` | `long` | `3000` | SLA padrão de duração do fluxo (em milissegundos). Violações disparam alerta `FLOW_LATENCY_SLA_BREACH`. |
+| `observability.alerting.default-step-sla-ms` | `long` | `1500` | SLA padrão de subprocessos/steps. Violações disparam alerta `INTEGRATION_LATENCY_SLA_BREACH`. |
+| `observability.alerting.flow-sla-ms.<nome-do-fluxo>` | `Map<String, Long>` | `{}` | SLAs customizados por nome de fluxo (ex: `flow-sla-ms.OrderCheckout: 1200`). |
+| `observability.alerting.step-sla-ms.<nome-do-step>` | `Map<String, Long>` | `{}` | SLAs customizados por nome de step (ex: `step-sla-ms.payment-gateway: 400`). |
+| `observability.alerting.hikari-pending-threshold` | `int` | `1` | Limiar de threads bloqueadas aguardando conexão no pool antes de disparar `DATABASE_POOL_STARVATION`. |
+| `observability.alerting.kafka-lag-threshold` | `long` | `100` | Limiar de lag de consumidor antes de disparar `KAFKA_LAG_HIGH`. |
+| `observability.alerting.sqs-depth-threshold` | `int` | `50` | Limiar de profundidade de fila antes de disparar `SQS_BACKLOG_HIGH`. |
 
 ---
 
-## 4. Exemplos de Configuração
+## 4. Exemplos Prontos de Configuração
 
 ### 4.1 Perfil de Produção Corporativo (Datadog Default)
 
@@ -83,6 +84,18 @@ observability:
   validation:
     mode: fail-fast # Bloqueia startup se houver conflito de topologia
 
+  alerting:
+    enabled: true
+    webhook-url: "https://alertmanager.internal/alerts"
+    default-flow-sla-ms: 2500
+    default-step-sla-ms: 1000
+    flow-sla-ms:
+      OrderCheckout: 1200
+      UserProvisioning: 800
+    step-sla-ms:
+      payment-gateway-charge: 500
+    hikari-pending-threshold: 2
+
   infrastructure:
     kafka-lag:
       enabled: false # Delegado nativamente ao Datadog Data Streams Monitoring
@@ -106,6 +119,11 @@ observability:
     exporters:
       - prometheus
 
+  alerting:
+    enabled: true
+    default-flow-sla-ms: 3000
+    default-step-sla-ms: 1500
+
   infrastructure:
     kafka-lag:
       enabled: true # Polling in-JVM ativo para alimentar queries PromQL locais
@@ -117,11 +135,11 @@ management:
     web:
       exposure:
         include: health, info, prometheus
-
+```
 
 ---
 
-## 4. Desativação em Testes de Unidade
+## 5. Desativação em Testes de Unidade
 
 Para testes que desejam rodar de forma completamente isolada de observabilidade:
 

@@ -77,20 +77,18 @@ Basta adicionar a dependência agregadora no `pom.xml` da aplicação:
 ```yaml
 observability:
   enabled: true
-  naming:
-    prefix: observability
+  profile: datadog
+  engine: datadog
   alerting:
     enabled: true
     webhook-url: "http://alert-manager.internal/webhook"
-    thresholds:
-      default-flow-sla-ms: 1000
-      default-step-sla-ms: 500
-      flow-slas:
-        "UserRegistration": 800
-      step-slas:
-        "step-validate-user": 200
-      hikari-pending-threads: 5
-      circuit-breaker-open: true
+    default-flow-sla-ms: 2000
+    default-step-sla-ms: 800
+    flow-sla-ms:
+      UserRegistration: 1000
+    step-sla-ms:
+      step-validate-user: 300
+    hikari-pending-threshold: 2
 ```
 
 ---
@@ -106,7 +104,7 @@ observability:
 | **Kafka (Producer/Consumer)** | Automática | Métricas de envio e consumo, injeção de correlation ID nos records. |
 | **AWS SQS** | Automática | Interceptor de mensagens, métricas de envio e correlação. |
 | **Resilience4j** | Automática | Monitoramento de transições de estado do Circuit Breaker (`OPEN`, `HALF_OPEN`) com alertas imediatos. |
-| **Subprocessos de Negócio** | Declarativa (`@TrackStep`) | Latência de esforço nominal vs atribuída no tempo de relógio, controle de SLA de subprocesso. |
+| **Subprocessos de Negócio** | Declarativa (`@TrackStep`) | Latência de esforço nominal vs atribuída no tempo de relógio, classificação arquitetural tipada via `ComponentType`. |
 | **Fluxos Semânticos** | Declarativa (`@TrackFlow`) | Delimitação de orquestrações de negócio ponta a ponta e governança de interrupções. |
 | **Auditoria Forense & LGPD** | Declarativa (`@LogLeg`) | Per-leg logging com mascaramento automático de dados sensíveis via SpEL (`@MaskField`). |
 | **Tags Dinâmicas** | Declarativa (`@ObservationTag`) | Extração dinâmica de dimensões semânticas a partir de argumentos e retornos com SpEL. |

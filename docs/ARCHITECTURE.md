@@ -126,6 +126,17 @@ $$\text{parallel\_overlap} = \sum \text{work}_i - \text{wallClock}$$
 
 **Garantia Arquitetural**: $\sum \text{attributed}_i \approx \text{wallClock}$ em 100% dos cenários.
 
+### Categorização Canônica de Componentes (`ComponentType`)
+Em conformidade com a Seção 50 da especificação Candidate Architecture v2, a latência de cada etapa não é registrada apenas pelo nome técnico do método, mas categorizada através do enum canônico `ComponentType`:
+* **HTTP & RPC**: `HTTP`, `FEIGN`, `GRPC`
+* **Persistência & Cache**: `DATABASE`, `CACHE`
+* **Mensageria & Filas**: `KAFKA`, `KAFKA_PRODUCER`, `KAFKA_CONSUMER`, `SQS`, `SQS_PRODUCER`, `SQS_CONSUMER`, `SNS`, `JMS`
+* **Execução Local & Negócio**: `BUSINESS` (default de `@TrackStep`), `INTERNAL`, `EXECUTOR`
+* **Resiliência**: `RETRY`, `CIRCUIT_BREAKER`, `BULKHEAD`, `RATE_LIMITER`
+* **Extensibilidade**: `CUSTOM`
+
+Essa separação alimenta a tag `type` nas métricas `observability.flow.component.*` e o atributo `step.type` no Datadog Service Map, permitindo dashboards universais e independentes de nomes específicos das aplicações.
+
 ---
 
 ## 5. Modelo de Execução Concorrente e Propagação de Contexto
