@@ -103,12 +103,21 @@ Pronto! Sua aplicação já possui:
 #### O Que É?
 Uma anotação de método aplicada no **ponto de entrada (entrypoint)** de um processo de negócio — tipicamente em métodos de `@RestController`, ouvintes `@KafkaListener`, ouvintes `@SqsListener` ou jobs agendados `@Scheduled`.
 
+#### Atributos da Anotação:
+| Atributo | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `value` / `name` | `String` | `""` | Identificador canônico do fluxo de negócio (ex: `"order-checkout"`, `"user-registration"`). |
+| `type` | `String` | `"HTTP"` | Protocolo ou gatilho de entrada (ex: `"HTTP"`, `"KAFKA"`, `"SQS"`, `"SCHEDULER"`). |
+| `variant` | `String` | `""` | Variante arquitetural ou de rota opcional (ex: `"legacy"`, `"v2"`, `"canary"`). |
+
+> **Nota sobre SLAs**: Limiares de latência e alarmística de SLA para o fluxo são configurados centralizadamente no `application.yml` via `observability.alerting.thresholds.flow-slas.<nome-do-fluxo>` ou `default-flow-sla-ms`.
+
 #### Por Que Usar?
 - **O Problema Sem a Anotação**: Por padrão, frameworks de telemetria criam spans técnicos como `HTTP GET /api/v1/orders/{orderId}/checkout`. Se a mesma orquestração for disparada via fila Kafka (`OrderCheckoutConsumer`), as métricas ficam separadas e incomunicáveis. Desenvolvedores costumavam criar timers manuais (`Timer.builder(...)`), errando no descarte de timers e poluindo métodos com código de cronometragem.
 - **A Solução com `@TrackFlow`**:
   1. Cria um escopo semântico canônico unificado (ex: `order-checkout`).
   2. Inicia o cronômetro mestre de relógio (*wall-clock duration*) para o fluxo.
-  3. Governança automática de SLA (`slaLimitMs`): se o fluxo ultrapassar o limiar, um evento `FLOW_LATENCY_SLA_BREACH` é disparado automaticamente pelo barramento de alertas e uma métrica de violação é incrementada.
+  3. Governança automática de SLA: se o fluxo ultrapassar o limiar de SLA configurado, um evento `FLOW_LATENCY_SLA_BREACH` é disparado automaticamente pelo barramento de alertas e uma métrica de violação é incrementada.
   4. Injeta a tag `flow="order-checkout"` automaticamente no MDC da thread e em todas as métricas filhas.
   5. Cria o span raiz de negócio na árvore de tracing distribuído.
 
@@ -131,11 +140,7 @@ public class OrderCheckoutController {
     }
 
     @PostMapping("/{orderId}/checkout")
-    @TrackFlow(
-        value = "order-checkout",
-        description = "Fluxo de finalização e liquidação de compra no e-commerce",
-        slaLimitMs = 1500
-    )
+    @TrackFlow(value = "order-checkout", type = "HTTP")
     public CheckoutResponse checkout(@PathVariable String orderId, @RequestBody CheckoutRequest request) {
         return checkoutUseCase.execute(orderId, request);
     }
@@ -158,9 +163,25 @@ public class OrderCheckoutController {
 #### O Que É?
 Uma anotação de método para fatiar o processamento interno em etapas distintas, categorizando-as arquiteturalmente por meio do enum fechado [`ComponentType`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ComponentType.java).
 
+#### Atributos da Anotação:
+| Atributo | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `value` / `name` | `String` | `""` | Identificador canônico da etapa (ex: `"charge-credit-card"`, `"save-order-record"`). |
+| `type` | `ComponentType` | `ComponentType.BUSINESS` | Categoria arquitetural do componente executado nesta etapa. |
+
+> **Nota sobre SLAs**: O SLA individual do subprocesso/step é configurado no `application.yml` via `observability.alerting.thresholds.step-slas.<nome-do-step>` ou `default-step-sla-ms`.
+
+#### O Enum Fechado `ComponentType` (18 Tipos Canônicos):
+- **Integrações HTTP & RPC**: `HTTP`, `FEIGN`, `GRPC`
+- **Persistência & Cache**: `DATABASE`, `CACHE`
+- **Mensageria & Filas**: `KAFKA`, `KAFKA_PRODUCER`, `KAFKA_CONSUMER`, `SQS`, `SQS_PRODUCER`, `SQS_CONSUMER`, `SNS`, `JMS`
+- **Execução Local & Negócio**: `BUSINESS` (padrão), `INTERNAL`, `EXECUTOR`
+- **Padrões de Resiliência**: `RETRY`, `CIRCUIT_BREAKER`, `BULKHEAD`, `RATE_LIMITER`
+- **Extensibilidade**: `CUSTOM`
+
 #### Por Que Usar?
 
-##### 1. Por que `ComponentType` é um enum restrito (18 tipos) em vez de String livre?
+##### 1. Por que `ComponentType` é um enum restrito em vez de String livre?
 - **O Risco da String Livre**: Quando desenvolvedores usam strings arbitrárias como `type="meu-banco-oracle-v2"` ou `type="chamada_cliente_legado"`, ocorre uma **explosão de cardinalidade** catastrófica no banco de séries temporais (Prometheus TSDB ou Datadog Metrics). Isso causa degradação de performance no servidor de métricas, elevação brutal nos custos de ingestão e faturas astronômicas em provedores SaaS.
 - **O Benefício do Enum Fechado**:
   - Garante risco zero de estouro de cardinalidade.
@@ -199,12 +220,7 @@ public class PaymentGatewayIntegration {
         this.feignClient = feignClient;
     }
 
-    @TrackStep(
-        value = "charge-credit-card",
-        type = ComponentType.FEIGN,
-        slaLimitMs = 800,
-        critical = true
-    )
+    @TrackStep(value = "charge-credit-card", type = ComponentType.FEIGN)
     public PaymentReceipt executeCharge(ChargeCommand command) {
         return feignClient.authorizePayment(command);
     }
@@ -246,15 +262,37 @@ Um mecanismo de auditoria forense estruturada para registrar saltos de rede e in
    - **Multiplica a fatura de ingestão de logs** em ferramentas SaaS (Datadog Logs, Splunk, SumoLogic) por 10x a 30x.
    - Por isso, por padrão, o `@LogLeg` registra estritamente os metadados de auditoria: duração da perna, endpoint, sistema alvo, status HTTP e código de retorno. O payload só é ativado deliberadamente onde estritamente necessário (`includePayload = true`).
 
+#### Atributos de `@LogLeg`:
+| Atributo | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `target` | `String` | `""` | Identificador do componente ou serviço alvo da perna (ex: `"customer-service"`, `"cielo-api"`). |
+| `type` | `LegType` | `LegType.OUTBOUND` | Direção arquitetural da integração: `INBOUND`, `OUTBOUND` ou `INTERNAL`. |
+| `includePayload` | `boolean` | `false` | Se `true`, serializa e audita os payloads (com máscaras aplicadas). Padrão `false` (opt-in estrito LGPD/PCI). |
+| `mask` | `MaskField[]` | `{}` | Regras de mascaramento dinâmico de dados sensíveis via SpEL. |
+
+#### Atributos de `@MaskField`:
+| Atributo | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `expression` | `String` | *(Obrigatório)* | Expressão SpEL ou propriedade JSON do campo sensível a ser mascarado (ex: `"#request.cpf"`). |
+| `pattern` | `MaskPattern` | `MaskPattern.FULL_MASK` | Padrão pré-configurado de mascaramento. |
+| `customMask` | `String` | `""` | Máscara estática personalizada opcional (sobrepõe o `pattern` se informada). |
+
+#### Catálogo de Padrões (`MaskPattern`):
+- `PASSWORD`: Redação total para senhas e tokens (`"********"`).
+- `CARD_PARTIAL`: Mascaramento parcial de cartão de crédito padrão PCI-DSS (`"************1234"`).
+- `CPF_PARTIAL`: Preserva primeiros e últimos dígitos para auditoria (`"123.***.***-45"`).
+- `EMAIL_PARTIAL`: Preserva primeira/última letra do usuário e o domínio (`"j***e@dominio.com"`).
+- `FULL_MASK`: Redação total com substituição por `"***REDACTED***"`.
+
 #### Como Usar?
 
 ```java
 package com.empresa.ecommerce.entrypoint;
 
+import com.empresa.platform.observability.core.annotation.LegType;
 import com.empresa.platform.observability.core.annotation.LogLeg;
 import com.empresa.platform.observability.core.annotation.MaskField;
-import com.empresa.platform.observability.core.annotation.leg.LegType;
-import com.empresa.platform.observability.core.annotation.leg.MaskPattern;
+import com.empresa.platform.observability.core.annotation.MaskPattern;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -387,7 +425,15 @@ public void updatePermissions(User user) {
 ### 3.5. `@ObservationTag` e `@ObservationTags`: Dimensões de Métricas e Spans
 
 #### O Que É?
-Anotação declarativa para anexar tags semânticas ao ciclo de vida da `Observation` do Micrometer (afetando tanto métricas temporais quanto spans de tracing distribuído).
+Anotação declarativa para anexar tags semânticas ao ciclo de vida da `Observation` do Micrometer (afetando tanto métricas temporais quanto spans de tracing distribuído). É repetível no mesmo método ou parâmetro e encapsulada pelo contêiner [`@ObservationTags`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ObservationTags.java).
+
+#### Atributos da Anotação:
+| Atributo | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `key` | `String` | *(Obrigatório)* | Nome identificador da tag semântica (ex: `"customer.tier"`, `"payment.method"`). |
+| `expression` | `String` | `""` | Expressão SpEL avaliada dinamicamente a partir dos argumentos (`#request.tier`) ou do retorno (`#result?.status()`). |
+| `lowCardinality` | `boolean` | `true` | Se `true`, a tag é roteada para as séries temporais do TSDB (Prometheus / Datadog Metrics). |
+| `highCardinality` | `boolean` | `false` | Se `true`, a tag é roteada estritamente como atributo do Span no Tracing (OTel / Datadog APM). |
 
 #### Por Que Usar?
 Permite enriquecer métricas e spans a partir de dados de entrada (`#param`) ou resultados retornados (`#result`) sem precisar injetar APIs do Micrometer.
@@ -397,12 +443,13 @@ Permite enriquecer métricas e spans a partir de dados de entrada (`#param`) ou 
   - Destinado a dimensões finitas e previsíveis: tipo de plano (`FREE`, `PREMIUM`), região (`US_EAST`, `SA_EAST`), método de pagamento (`PIX`, `CREDIT_CARD`), status (`SUCCESS`, `ERROR`).
   - É roteado para o **TSDB (Prometheus / Datadog Metrics)**.
   - **NUNCA** coloque identificadores únicos (`userId`, `orderId`, `email`, `cpf`) com `lowCardinality = true`.
-- **`lowCardinality = false`**:
+- **`lowCardinality = false` / `highCardinality = true`**:
   - Destinado a identificadores únicos ou de alta cardinalidade: `orderId="ord-99238"`, `transactionId="tx-18491823"`.
   - É roteado **exclusivamente para os atributos do Span de tracing** (Jaeger / OpenTelemetry / Datadog APM).
   - Não cria séries temporais no Prometheus, mantendo seu banco de métricas saudável e barato.
 
 #### Como Usar?
+
 
 ```java
 package com.empresa.ecommerce.service;
@@ -429,7 +476,15 @@ public class SubscriptionService {
 ### 3.6. `@FlowDimension`: Variantes de Negócio e Migrações Graduais
 
 #### O Que É?
-Uma anotação de primeira classe para anexar dimensões de negócio macro ao escopo do `@TrackFlow`.
+Uma anotação de primeira classe para anexar dimensões de negócio macro ao escopo do `@TrackFlow`. É repetível e agrupada automaticamente sob o contêiner [`@FlowDimensionsTag`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/FlowDimensionsTag.java).
+
+#### Atributos da Anotação:
+| Atributo | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `key` / `name` | `String` | `""` | Identificador da dimensão de negócio (ex: `"variant"`, `"tenant"`, `"channel"`, `"region"`). |
+| `value` | `String` | `""` | Valor estático atribuído à dimensão quando aplicada no nível de método ou classe. |
+| `expression` | `String` | `""` | Expressão SpEL opcional avaliada dinamicamente a partir dos parâmetros de entrada do método. |
+| `mdc` | `boolean` | `true` | Se `true`, propaga automaticamente a dimensão para o SLF4J MDC da thread atual. |
 
 #### Por Que Usar?
 Em migrações arquiteturais, implantações graduais (*canary deployments*) ou testes A/B de novas regras de negócio:
@@ -444,14 +499,28 @@ Em migrações arquiteturais, implantações graduais (*canary deployments*) ou 
 
 #### Como Usar?
 
+##### 1. No Nível de Método (com Múltiplas Dimensões via Repetição):
 ```java
-@TrackFlow("order-checkout")
+@TrackFlow(name = "order-checkout-flow")
 @FlowDimension(key = "variant", value = "async-event-driven")
+@FlowDimension(key = "channel", value = "mobile-app")
 @PostMapping("/checkout")
 public OrderResponse checkout(@RequestBody CheckoutRequest request) {
     return orderService.process(request);
 }
 ```
+
+##### 2. No Nível de Parâmetro (Injeção Dinâmica):
+```java
+@TrackFlow(name = "billing-invoice-flow")
+@PostMapping("/invoices")
+public InvoiceResponse generateInvoice(
+        @FlowDimension(key = "tenant") @RequestParam String tenant,
+        @RequestBody InvoiceRequest request) {
+    return invoiceService.generate(tenant, request);
+}
+```
+
 
 ---
 
@@ -610,7 +679,7 @@ public class OrderController {
     }
 
     @PostMapping
-    @TrackFlow(value = "order-checkout", description = "Orquestração completa de compra", slaLimitMs = 1500)
+    @TrackFlow(value = "order-checkout", type = "HTTP")
     @FlowDimension(key = "checkout_channel", value = "web-portal")
     @LogLeg(
         target = "order-ingress",
@@ -680,7 +749,6 @@ Aplica `@TrackStep`, `@CircuitBreaker`, `@LogLeg` e `@ObservationTag`:
 package com.empresa.ecommerce.integration;
 
 import com.empresa.platform.observability.core.annotation.*;
-import com.empresa.platform.observability.core.annotation.leg.LegType;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Component;
 
@@ -693,7 +761,7 @@ public class PaymentClient {
         this.feignClient = feignClient;
     }
 
-    @TrackStep(value = "charge-payment-gateway", type = ComponentType.FEIGN, slaLimitMs = 800, critical = true)
+    @TrackStep(value = "charge-payment-gateway", type = ComponentType.FEIGN)
     @LogLeg(target = "payment-gateway", type = LegType.OUTBOUND)
     @CircuitBreaker(name = "payment-gateway", fallbackMethod = "chargeFallback")
     @ObservationTag(key = "payment.provider", expression = "'cielo'", lowCardinality = true)
