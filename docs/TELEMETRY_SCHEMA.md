@@ -78,7 +78,7 @@ O starter gerencia e propaga automaticamente chaves canônicas de contexto em to
 | `flow` | `user-creation-flow` | `FlowTrackingAspect` | Nome do fluxo de negócio orquestrado ativo na thread. |
 | `step` | `step-validate-user` | `FlowTrackingAspect` | Nome do subprocesso ou step atualmente em execução. |
 | `step.type` | `BUSINESS`, `HTTP`, `DATABASE`, ... | `FlowTrackingAspect` | Categoria canônica do enum `ComponentType` da etapa em execução. |
-| `<custom_mdc_key>` (`userId`, `orderId`, etc.) | `usr_9812`, `ord_551` | `MdcAspect` ([`@MDC`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/MDC.java)) | Atributo dinâmico de negócio injetado nos logs (SLF4J MDC) via parâmetro ou SpEL, com ciclo de vida e restauração segura em `finally`. |
+| `<custom_mdc_key>` (`userId`, `orderId`, etc.) | `usr_9812`, `ord_551` | `MdcAspect` ([`@MDC`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/MDC.java)) | Atributo dinâmico de negócio injetado nos logs (SLF4J MDC) via parâmetro ou SpEL, com ciclo de vida e restauração segura em `finally`. |
 | `<dimension>` (`tenant`, etc.) | `corporate-1` | `FlowTrackingAspect` (`@FlowDimension`) | Dimensão declarativa de fluxo extraída de parâmetro para métricas e MDC simultaneamente. |
 | `variant` | `new` ou `legacy` | `FlowContext` / Feature Flags | Identificador da variante da arquitetura/código (útil em canary releases e migrações v1->v2). |
 | `feature.name` | `payment-v2` | `FlowFeatureEvaluationListener` | Nome da feature flag associada à execução. |
@@ -126,7 +126,7 @@ As aplicações configuradas com saída JSON emitem eventos estruturados no segu
 {
   "timestamp": "2026-09-29T15:30:00.123Z",
   "level": "INFO",
-  "logger": "com.empresa.service.UserService",
+  "logger": "com.gleidsonfersanp.service.UserService",
   "thread": "http-nio-8080-exec-3",
   "message": "Usuário criado com sucesso no banco de dados.",
   "context": {

@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.empresa.platform</groupId>
+    <groupId>com.gleidsonfersanp.platform</groupId>
     <artifactId>corporate-observability-parent</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
@@ -60,32 +60,32 @@
 
             <!-- Internal modules -->
             <dependency>
-                <groupId>com.empresa.platform</groupId>
+                <groupId>com.gleidsonfersanp.platform</groupId>
                 <artifactId>observability-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.empresa.platform</groupId>
+                <groupId>com.gleidsonfersanp.platform</groupId>
                 <artifactId>observability-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.empresa.platform</groupId>
+                <groupId>com.gleidsonfersanp.platform</groupId>
                 <artifactId>observability-autoconfigure</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.empresa.platform</groupId>
+                <groupId>com.gleidsonfersanp.platform</groupId>
                 <artifactId>observability-spring-boot-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.empresa.platform</groupId>
+                <groupId>com.gleidsonfersanp.platform</groupId>
                 <artifactId>observability-test</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.empresa.platform</groupId>
+                <groupId>com.gleidsonfersanp.platform</groupId>
                 <artifactId>observability-legacy-compat</artifactId>
                 <version>${project.version}</version>
             </dependency>

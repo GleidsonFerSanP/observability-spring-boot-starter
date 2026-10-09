@@ -62,7 +62,7 @@ Adicione o starter agregador no arquivo `pom.xml` da sua aplicação:
 
 ```xml
 <dependency>
-    <groupId>com.empresa.platform</groupId>
+    <groupId>com.gleidsonfersanp.platform</groupId>
     <artifactId>observability-spring-boot-starter</artifactId>
     <version>1.0.0</version>
 </dependency>
@@ -124,9 +124,9 @@ Uma anotação de método aplicada no **ponto de entrada (entrypoint)** de um pr
 #### Como Usar?
 
 ```java
-package com.empresa.ecommerce.entrypoint;
+package com.gleidsonfersanp.ecommerce.entrypoint;
 
-import com.empresa.platform.observability.core.annotation.TrackFlow;
+import com.gleidsonfersanp.platform.observability.core.annotation.TrackFlow;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -161,7 +161,7 @@ public class OrderCheckoutController {
 ### 3.2. `@TrackStep` e `ComponentType`: Fatiamento de Latência e Topologia Padronizada
 
 #### O Que É?
-Uma anotação de método para fatiar o processamento interno em etapas distintas, categorizando-as arquiteturalmente por meio do enum fechado [`ComponentType`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ComponentType.java).
+Uma anotação de método para fatiar o processamento interno em etapas distintas, categorizando-as arquiteturalmente por meio do enum fechado [`ComponentType`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/ComponentType.java).
 
 #### Atributos da Anotação:
 | Atributo | Tipo | Padrão | Descrição |
@@ -196,7 +196,7 @@ Em métodos que executam integrações concorrentes (ex: `CompletableFuture.allO
 - **Soma Simples (Esforço Nominal)**: 600ms.
 - **Tempo Real de Relógio (Wall-Clock Total)**: Apenas 210ms!
 
-Se a ferramenta de métricas somar ingenuamente os tempos, o gráfico de pizza ultrapassa 100% da duração real. O motor [`LatencyAttributionEngine`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-core/src/main/java/com/empresa/platform/observability/core/attribution/LatencyAttributionEngine.java) do starter resolve isso:
+Se a ferramenta de métricas somar ingenuamente os tempos, o gráfico de pizza ultrapassa 100% da duração real. O motor [`LatencyAttributionEngine`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-core/src/main/java/com/gleidsonfersanp/platform/observability/core/attribution/LatencyAttributionEngine.java) do starter resolve isso:
 - Calcula o esforço nominal bruto em `observability.flow.component.work.duration`.
 - Calcula a fatia fracionária normalizada atribuída ao relógio em `observability.flow.component.attributed.duration`.
 - Calcula a sobreposição paralela economizada em `observability.flow.parallel.overlap.duration`.
@@ -205,10 +205,10 @@ Se a ferramenta de métricas somar ingenuamente os tempos, o gráfico de pizza u
 #### Como Usar?
 
 ```java
-package com.empresa.ecommerce.integration;
+package com.gleidsonfersanp.ecommerce.integration;
 
-import com.empresa.platform.observability.core.annotation.ComponentType;
-import com.empresa.platform.observability.core.annotation.TrackStep;
+import com.gleidsonfersanp.platform.observability.core.annotation.ComponentType;
+import com.gleidsonfersanp.platform.observability.core.annotation.TrackStep;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -287,12 +287,12 @@ Um mecanismo de auditoria forense estruturada para registrar saltos de rede e in
 #### Como Usar?
 
 ```java
-package com.empresa.ecommerce.entrypoint;
+package com.gleidsonfersanp.ecommerce.entrypoint;
 
-import com.empresa.platform.observability.core.annotation.LegType;
-import com.empresa.platform.observability.core.annotation.LogLeg;
-import com.empresa.platform.observability.core.annotation.MaskField;
-import com.empresa.platform.observability.core.annotation.MaskPattern;
+import com.gleidsonfersanp.platform.observability.core.annotation.LegType;
+import com.gleidsonfersanp.platform.observability.core.annotation.LogLeg;
+import com.gleidsonfersanp.platform.observability.core.annotation.MaskField;
+import com.gleidsonfersanp.platform.observability.core.annotation.MaskPattern;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -404,7 +404,7 @@ Anotações que injetam chaves e valores no SLF4J MDC (Mapped Diagnostic Context
   ```
 - **Segurança Absoluta contra Vazamento em Thread Pools (Stack Semantics)**:
   Em servidores com reuso de threads (Tomcat, Netty, pools de `@Async`), se uma exceção ocorrer antes de um `MDC.remove()`, a thread volta ao pool com o `userId` de um cliente e atende a requisição de **outro cliente** minutos depois, misturando logs e gerando incidentes graves de privacidade.
-  O aspecto [`MdcAspect`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-core/src/main/java/com/empresa/platform/observability/core/aspect/MdcAspect.java) implementa semântica de pilha (*stack semantics*):
+  O aspecto [`MdcAspect`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-core/src/main/java/com/gleidsonfersanp/platform/observability/core/aspect/MdcAspect.java) implementa semântica de pilha (*stack semantics*):
   - Ao entrar no método, guarda o valor prévio daquela chave (caso já existisse em um método chamador).
   - No bloco `finally`, restaura o valor anterior ou remove a chave se ela não existia.
 - **Por que está separado de `@ObservationTag`?**
@@ -464,7 +464,7 @@ public void updatePermissions(User user) {
 ### 3.5. `@ObservationTag` e `@ObservationTags`: Dimensões de Métricas e Spans
 
 #### O Que É?
-Anotação declarativa para anexar tags semânticas ao ciclo de vida da `Observation` do Micrometer (afetando tanto métricas temporais quanto spans de tracing distribuído). É repetível no mesmo método ou parâmetro e encapsulada pelo contêiner [`@ObservationTags`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ObservationTags.java).
+Anotação declarativa para anexar tags semânticas ao ciclo de vida da `Observation` do Micrometer (afetando tanto métricas temporais quanto spans de tracing distribuído). É repetível no mesmo método ou parâmetro e encapsulada pelo contêiner [`@ObservationTags`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/ObservationTags.java).
 
 #### Atributos da Anotação:
 | Atributo | Tipo | Padrão | Descrição |
@@ -491,9 +491,9 @@ Permite enriquecer métricas e spans a partir de dados de entrada (`#param`) ou 
 
 
 ```java
-package com.empresa.ecommerce.service;
+package com.gleidsonfersanp.ecommerce.service;
 
-import com.empresa.platform.observability.core.annotation.ObservationTag;
+import com.gleidsonfersanp.platform.observability.core.annotation.ObservationTag;
 import io.micrometer.observation.annotation.Observed;
 import org.springframework.stereotype.Service;
 
@@ -515,7 +515,7 @@ public class SubscriptionService {
 ### 3.6. `@FlowDimension`: Variantes de Negócio e Migrações Graduais
 
 #### O Que É?
-Uma anotação de primeira classe para anexar dimensões de negócio macro ao escopo do `@TrackFlow`. É repetível e agrupada automaticamente sob o contêiner [`@FlowDimensionsTag`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/FlowDimensionsTag.java).
+Uma anotação de primeira classe para anexar dimensões de negócio macro ao escopo do `@TrackFlow`. É repetível e agrupada automaticamente sob o contêiner [`@FlowDimensionsTag`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/FlowDimensionsTag.java).
 
 #### Atributos da Anotação:
 | Atributo | Tipo | Padrão | Descrição |
@@ -595,7 +595,7 @@ sequenceDiagram
 ### 3.8. Centralização Corporativa de Logging: Logback Multi-Perfil
 
 #### O Que É?
-O starter empacota as configurações corporativas canônicas [`logback.yml`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/resources/logback.yml) e [`observability-logback-defaults.xml`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/resources/com/empresa/platform/observability/logback/observability-logback-defaults.xml).
+O starter empacota as configurações corporativas canônicas [`logback.yml`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/resources/logback.yml) e [`observability-logback-defaults.xml`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/resources/com/gleidsonfersanp/platform/observability/logback/observability-logback-defaults.xml).
 
 #### Por Que Usar?
 - **Zero Configuração Duplicada**: Evita que cada novo microsserviço copie e cole arquivos XML de 300 linhas de Logback propensos a erros e divergências de formatação.
@@ -618,7 +618,7 @@ Se o seu microsserviço precisar de um `logback-spring.xml` próprio (por exempl
 
 ```xml
 <configuration>
-    <include resource="com/empresa/platform/observability/logback/observability-logback-defaults.xml"/>
+    <include resource="com/gleidsonfersanp/platform/observability/logback/observability-logback-defaults.xml"/>
     
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
@@ -634,7 +634,7 @@ Se o seu microsserviço precisar de um `logback-spring.xml` próprio (por exempl
 Um barramento desacoplado para emissão e tratamento de eventos de anomalia e incidentes operacionais em tempo de execução.
 
 #### Por Que Usar?
-Em vez de acoplar sua aplicação diretamente a clientes de webhook do Slack, Teams, PagerDuty ou APIs do Datadog, o starter emite eventos desacoplados através de [`AlertDispatcher.dispatch(AlertEvent)`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/alerting/AlertDispatcher.java).
+Em vez de acoplar sua aplicação diretamente a clientes de webhook do Slack, Teams, PagerDuty ou APIs do Datadog, o starter emite eventos desacoplados através de [`AlertDispatcher.dispatch(AlertEvent)`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/alerting/AlertDispatcher.java).
 
 #### Eventos Monitorados Automaticamente pelo Starter:
 | Tipo de Alerta (`AlertType`) | Severidade | Gatilho Automático |
@@ -648,14 +648,14 @@ Em vez de acoplar sua aplicação diretamente a clientes de webhook do Slack, Te
 | `SQS_BACKLOG_HIGH` | `WARNING` | Fila SQS acumulou profundidade de mensagens acima do limiar. |
 
 #### Como Criar um Notificador Customizado (Ex: Notificação de Incidentes no Slack)?
-Basta registrar um componente Spring implementando [`AlertNotifier`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/alerting/AlertNotifier.java):
+Basta registrar um componente Spring implementando [`AlertNotifier`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/alerting/AlertNotifier.java):
 
 ```java
-package com.empresa.ecommerce.alerting;
+package com.gleidsonfersanp.ecommerce.alerting;
 
-import com.empresa.platform.observability.core.alerting.AlertEvent;
-import com.empresa.platform.observability.core.alerting.AlertNotifier;
-import com.empresa.platform.observability.core.alerting.AlertSeverity;
+import com.gleidsonfersanp.platform.observability.core.alerting.AlertEvent;
+import com.gleidsonfersanp.platform.observability.core.alerting.AlertNotifier;
+import com.gleidsonfersanp.platform.observability.core.alerting.AlertSeverity;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -677,7 +677,7 @@ public class SlackIncidentNotifier implements AlertNotifier {
 ### 3.10. Single Producer e Neutralidade de Vendor (Datadog vs Prometheus)
 
 #### O Que É?
-Uma garantia arquitetural rigorosa aplicada no momento da inicialização da JVM (*fail-fast startup validation*) através do [`ObservabilityTopologyValidator`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/java/com/empresa/platform/observability/autoconfigure/topology/ObservabilityTopologyValidator.java).
+Uma garantia arquitetural rigorosa aplicada no momento da inicialização da JVM (*fail-fast startup validation*) através do [`ObservabilityTopologyValidator`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/java/com/gleidsonfersanp/platform/observability/autoconfigure/topology/ObservabilityTopologyValidator.java).
 
 #### O Princípio "Single Producer per Signal":
 - **O Problema da Duplicidade de Custos**: Se uma aplicação subir ao mesmo tempo o registry do Datadog e o endpoint do Prometheus raspado por um agente, a empresa paga **duas vezes** pelo armazenamento e ingestão da mesma métrica em provedores de nuvem.
@@ -696,11 +696,11 @@ Vamos demonstrar como um fluxo de negócio completo é construído com elegânci
 Aplica `@TrackFlow`, `@MDC` para enriquecer logs e `@LogLeg` para registrar a requisição recebida com mascaramento:
 
 ```java
-package com.empresa.ecommerce.api;
+package com.gleidsonfersanp.ecommerce.api;
 
-import com.empresa.ecommerce.domain.*;
-import com.empresa.platform.observability.core.annotation.*;
-import com.empresa.platform.observability.core.annotation.leg.*;
+import com.gleidsonfersanp.ecommerce.domain.*;
+import com.gleidsonfersanp.platform.observability.core.annotation.*;
+import com.gleidsonfersanp.platform.observability.core.annotation.leg.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -743,10 +743,10 @@ public class OrderController {
 Aplica `@TrackStep` para fatiar o tempo gasto no processamento de negócio, delegando as integrações:
 
 ```java
-package com.empresa.ecommerce.domain;
+package com.gleidsonfersanp.ecommerce.domain;
 
-import com.empresa.ecommerce.integration.*;
-import com.empresa.platform.observability.core.annotation.*;
+import com.gleidsonfersanp.ecommerce.integration.*;
+import com.gleidsonfersanp.platform.observability.core.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -785,9 +785,9 @@ public class OrderOrchestratorService {
 Aplica `@TrackStep`, `@CircuitBreaker`, `@LogLeg` e `@ObservationTag`:
 
 ```java
-package com.empresa.ecommerce.integration;
+package com.gleidsonfersanp.ecommerce.integration;
 
-import com.empresa.platform.observability.core.annotation.*;
+import com.gleidsonfersanp.platform.observability.core.annotation.*;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.stereotype.Component;
 

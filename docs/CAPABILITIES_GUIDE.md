@@ -50,7 +50,7 @@ public class PaymentGatewayClient {
 
 ### 2.1 Catálogo Canônico de Tipos de Componentes (`ComponentType`):
 
-O enum [`ComponentType`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ComponentType.java) padroniza a categorização arquitetural dos subprocessos (Candidate Architecture v2 - Seção 50):
+O enum [`ComponentType`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/ComponentType.java) padroniza a categorização arquitetural dos subprocessos (Candidate Architecture v2 - Seção 50):
 
 | Categoria | `ComponentType` | Descrição & Quando Usar |
 |---|---|---|
@@ -164,9 +164,9 @@ Para assegurar uma separação arquitetural cristalina de responsabilidades, o s
 
 | Anotação | Finalidade | Destino / Efeito | Ciclo de Vida |
 |---|---|---|---|
-| **[`@MDC`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/MDC.java)** | **Contexto de Logging (SLF4J MDC)** | Injeta variáveis nos logs estruturados e console. Elimina 100% dos `MDC.put` e `MDC.remove` do código de negócio. | Empilhado (*stack semantics*) no início do método e removido/restaurado em `finally`. |
-| **[`@ObservationTag`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/ObservationTag.java)** | **Métricas e Tracing Spans (Micrometer)** | Injeta tags na `Observation` ativa (`lowCardinality` em timers Prometheus/Datadog; `highCardinality` em spans OpenTelemetry/Datadog APM). | Associado ao ciclo de vida da `Observation` do Micrometer. |
-| **[`@FlowDimension`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/empresa/platform/observability/core/annotation/FlowDimension.java)** | **Dimensão de Negócio do Fluxo** | Dimensões macro anexadas ao `@TrackFlow`, propagadas automaticamente para métricas de fluxo e MDC. | Durante todo o escopo do `@TrackFlow`. |
+| **[`@MDC`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/MDC.java)** | **Contexto de Logging (SLF4J MDC)** | Injeta variáveis nos logs estruturados e console. Elimina 100% dos `MDC.put` e `MDC.remove` do código de negócio. | Empilhado (*stack semantics*) no início do método e removido/restaurado em `finally`. |
+| **[`@ObservationTag`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/ObservationTag.java)** | **Métricas e Tracing Spans (Micrometer)** | Injeta tags na `Observation` ativa (`lowCardinality` em timers Prometheus/Datadog; `highCardinality` em spans OpenTelemetry/Datadog APM). | Associado ao ciclo de vida da `Observation` do Micrometer. |
+| **[`@FlowDimension`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-api/src/main/java/com/gleidsonfersanp/platform/observability/core/annotation/FlowDimension.java)** | **Dimensão de Negócio do Fluxo** | Dimensões macro anexadas ao `@TrackFlow`, propagadas automaticamente para métricas de fluxo e MDC. | Durante todo o escopo do `@TrackFlow`. |
 
 ---
 
@@ -383,7 +383,7 @@ O starter fornece uma configuração corporativa padronizada para o Logback, eli
 
 ### 8.1 Carregamento Automático via `logback.yml`
 
-Através do [`ObservabilityLoggingEnvironmentPostProcessor`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/java/com/empresa/platform/observability/autoconfigure/logging/ObservabilityLoggingEnvironmentPostProcessor.java), o starter injeta na inicialização do Spring Boot as propriedades padrão de logging definidas em `logback.yml` com prioridade padrão (*lowest precedence*). Isso significa que qualquer microsserviço pode sobrescrever qualquer propriedade em seu próprio `application.yml`:
+Através do [`ObservabilityLoggingEnvironmentPostProcessor`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-autoconfigure/src/main/java/com/gleidsonfersanp/platform/observability/autoconfigure/logging/ObservabilityLoggingEnvironmentPostProcessor.java), o starter injeta na inicialização do Spring Boot as propriedades padrão de logging definidas em `logback.yml` com prioridade padrão (*lowest precedence*). Isso significa que qualquer microsserviço pode sobrescrever qualquer propriedade em seu próprio `application.yml`:
 
 * **Padrão de Console Colorido (Dev/Local)**:
   Exibe timestamp, thread, nível, logger, e os identificadores canônicos de observabilidade:
@@ -400,7 +400,7 @@ Caso a aplicação utilize um `logback-spring.xml` próprio (por exemplo, para c
 ```xml
 <configuration>
     <!-- Importa appenders padronizados e convenções semânticas corporativas -->
-    <include resource="com/empresa/platform/observability/logback/observability-logback-defaults.xml"/>
+    <include resource="com/gleidsonfersanp/platform/observability/logback/observability-logback-defaults.xml"/>
 
     <!-- Seus appenders específicos podem estender ou reutilizar os padrões -->
     <root level="INFO">

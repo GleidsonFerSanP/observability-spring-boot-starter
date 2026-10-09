@@ -162,7 +162,7 @@ O starter injeta automaticamente propriedades padrão de logging através do `Ob
 |---|---|---|
 | `logging.pattern.console` | `%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} ...` | Padrão ANSI colorido com timestamp, thread, nível, logger, `cid`, `traceId`, `spanId`, `flow` e `step`. |
 | `logging.pattern.level` | `%5p [cid=%X{correlation_id:-none}]` | Injeta o Correlation ID canônico no prefixo do nível de log. |
-| `logging.level.com.empresa.platform.observability` | `INFO` | Nível de log dos interceptores, aspectos e engines do starter. |
+| `logging.level.com.gleidsonfersanp.platform.observability` | `INFO` | Nível de log dos interceptores, aspectos e engines do starter. |
 | `logging.level.AUDIT_LEG_LOGGER` | `INFO` | Nível do logger estruturado forense de pernas (`@LogLeg`). |
 | `logging.level.org.springframework.web` | `INFO` | Nível de log para requisições web do framework. |
 
@@ -173,7 +173,7 @@ Para aplicações que utilizam arquivo XML de logback:
 ```xml
 <configuration>
     <!-- Importa appenders padronizados e convenções semânticas corporativas -->
-    <include resource="com/empresa/platform/observability/logback/observability-logback-defaults.xml"/>
+    <include resource="com/gleidsonfersanp/platform/observability/logback/observability-logback-defaults.xml"/>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>

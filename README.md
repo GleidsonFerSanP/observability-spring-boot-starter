@@ -67,7 +67,7 @@ Basta adicionar a dependência agregadora no `pom.xml` da aplicação:
 
 ```xml
 <dependency>
-    <groupId>com.empresa.platform</groupId>
+    <groupId>com.gleidsonfersanp.platform</groupId>
     <artifactId>observability-spring-boot-starter</artifactId>
     <version>1.0.0</version>
 </dependency>

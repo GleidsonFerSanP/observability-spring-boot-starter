@@ -19,7 +19,7 @@ logging:
     com.zaxxer.hikari: INFO
     io.awspring.cloud.sqs: INFO
     # Starter de observabilidade corporativa
-    com.empresa.platform.observability: INFO
+    com.gleidsonfersanp.platform.observability: INFO
     AUDIT_LEG_LOGGER: INFO
 
 observability:

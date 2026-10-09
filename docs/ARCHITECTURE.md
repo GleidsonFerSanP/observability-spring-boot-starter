@@ -111,7 +111,7 @@ Em arquiteturas modernas com `CompletableFuture`, chamadas paralelas (ex: enriqu
 - Starters ingênuos geram frações negativas ou usam `Math.max(0, ...)` que mascaram a latência e corrompem dashboards de composição (pie charts e stacked graphs).
 
 ### Invariantes Matemáticas Canônicas
-O [`LatencyAttributionEngine`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-core/src/main/java/com/empresa/platform/observability/core/flow/LatencyAttributionEngine.java) divide a medição em **três dimensões**:
+O [`LatencyAttributionEngine`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-spring-boot-starter-core/src/main/java/com/gleidsonfersanp/platform/observability/core/flow/LatencyAttributionEngine.java) divide a medição em **três dimensões**:
 1. **Wall-Clock Duration (`observability.flow.duration`)**: Latência real percebida pelo chamador.
 2. **Work Duration (`observability.flow.component.work.duration`)**: Duração bruta consumida por cada subprocesso, independente de sobreposição.
 3. **Attributed Duration (`observability.flow.component.attributed.duration`)**: Latência atribuída normalizada para composição de custo.
@@ -201,7 +201,7 @@ flowchart TD
 ```
 
 ### Contrato da SPI (`ObservabilityEngine`)
-Localizada em `com.empresa.platform.observability.core.engine`:
+Localizada em `com.gleidsonfersanp.platform.observability.core.engine`:
 - `EngineCapabilities getCapabilities()`: Descoberta de recursos em tempo de execução (Service Map, Request Flow Map, DSM, in-JVM lag polling).
 - `FlowScope startFlow(...)` e `void completeFlow(...)`: Gerenciamento do ciclo de vida e dimensões do fluxo.
 - `StepScope startStep(...)` e `void completeStep(...)`: Medição e marcação de subprocessos.
@@ -247,7 +247,7 @@ O módulo `observability-autoconfigure` implementa o `ObservabilityTopologyValid
 
 A explosão de cardinalidade (*cardinality bomb*) ocorre quando atributos com alta variabilidade (IDs de usuário, CPFs, tokens UUID, timestamps) são injetados indevidamente como tags de métricas em bancos de séries temporais (TSDB), causando esgotamento de memória (OOM) no Prometheus ou custos astronômicos de métricas customizadas no Datadog.
 
-O starter estabelece a separação rígida implementada em [`CardinalityPolicy`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-core/src/main/java/com/empresa/platform/observability/core/cardinality/CardinalityPolicy.java):
+O starter estabelece a separação rígida implementada em [`CardinalityPolicy`](file:///Users/gleidsonfersanp/workspace/observability-spring-boot-starter-project/observability-core/src/main/java/com/gleidsonfersanp/platform/observability/core/cardinality/CardinalityPolicy.java):
 
 ```mermaid
 flowchart LR
