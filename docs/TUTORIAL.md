@@ -64,7 +64,7 @@ Adicione o starter agregador no arquivo `pom.xml` da sua aplicação:
 <dependency>
     <groupId>com.empresa.platform</groupId>
     <artifactId>observability-spring-boot-starter</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 

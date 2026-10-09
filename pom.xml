@@ -13,7 +13,7 @@
 
     <groupId>com.empresa.platform</groupId>
     <artifactId>corporate-observability-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>corporate-observability-parent</name>
     <description>Corporate Observability Platform Root POM</description>
