@@ -154,11 +154,11 @@ public class ObservabilityAutoConfiguration {
         return new LoggingObservationHandler();
     }
 
-    @Bean
+    @Bean("observabilityCorrelationIdFilter")
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = {"correlationIdFilter", "observabilityCorrelationIdFilter"})
     @ConditionalOnProperty(prefix = "observability.correlation", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public CorrelationIdFilter correlationIdFilter() {
+    public CorrelationIdFilter observabilityCorrelationIdFilter() {
         return new CorrelationIdFilter();
     }
 
