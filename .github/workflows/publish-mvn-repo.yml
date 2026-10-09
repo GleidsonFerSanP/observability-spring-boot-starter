@@ -1,0 +1,56 @@
+name: Publish to mvn-repo
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Build and install locally
+        run: mvn clean install -DskipTests
+
+      - name: Prepare maven-repo artifacts
+        run: |
+          mkdir -p /tmp/repo/com/gleidsonfersanp
+          cp -r ~/.m2/repository/com/gleidsonfersanp/* /tmp/repo/com/gleidsonfersanp/
+          find /tmp/repo -name "_remote.repositories" -delete
+          find /tmp/repo -name "maven-metadata-local.xml" -exec bash -c 'mv "$0" "${0/-local/}"' {} \;
+          python3 -c "
+          import os, hashlib
+          for root, dirs, files in os.walk('/tmp/repo'):
+              for f in files:
+                  if f.endswith(('.jar', '.pom', '.xml')) and not f.endswith(('.sha1', '.md5', '.sha256')):
+                      p = os.path.join(root, f)
+                      data = open(p, 'rb').read()
+                      open(p + '.sha1', 'w').write(hashlib.sha1(data).hexdigest())
+                      open(p + '.md5', 'w').write(hashlib.md5(data).hexdigest())
+                      open(p + '.sha256', 'w').write(hashlib.sha256(data).hexdigest())
+          "
+
+      - name: Deploy to mvn-repo branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: mvn-repo
+          publish_dir: /tmp/repo
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
