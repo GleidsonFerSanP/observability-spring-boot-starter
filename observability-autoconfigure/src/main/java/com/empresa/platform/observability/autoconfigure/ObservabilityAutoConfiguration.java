@@ -33,7 +33,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 
@@ -79,11 +78,12 @@ public class ObservabilityAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(name = "webhookAlertNotifier")
     @ConditionalOnProperty(prefix = "observability.alerting", name = "webhook-url")
+    @ConditionalOnClass(name = "org.springframework.web.client.RestTemplate")
     public WebhookAlertNotifier webhookAlertNotifier(
             AlertingProperties alertingProperties,
-            @Autowired(required = false) RestTemplateBuilder builder
+            @Autowired(required = false) org.springframework.web.client.RestTemplate restTemplate
     ) {
-        return new WebhookAlertNotifier(alertingProperties, builder);
+        return new WebhookAlertNotifier(alertingProperties, restTemplate);
     }
 
     @Bean

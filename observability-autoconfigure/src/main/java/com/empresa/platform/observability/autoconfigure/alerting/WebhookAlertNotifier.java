@@ -5,13 +5,11 @@ import com.empresa.platform.observability.core.alerting.AlertNotifier;
 import com.empresa.platform.observability.core.alerting.AlertingProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -21,12 +19,13 @@ public class WebhookAlertNotifier implements AlertNotifier {
     private final AlertingProperties properties;
     private final RestTemplate restTemplate;
 
-    public WebhookAlertNotifier(AlertingProperties properties, RestTemplateBuilder builder) {
+    public WebhookAlertNotifier(AlertingProperties properties) {
+        this(properties, null);
+    }
+
+    public WebhookAlertNotifier(AlertingProperties properties, RestTemplate restTemplate) {
         this.properties = properties;
-        this.restTemplate = (builder != null ? builder : new RestTemplateBuilder())
-                .setConnectTimeout(Duration.ofMillis(1000))
-                .setReadTimeout(Duration.ofMillis(2000))
-                .build();
+        this.restTemplate = restTemplate != null ? restTemplate : new RestTemplate();
     }
 
     @Override
